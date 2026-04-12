@@ -1029,7 +1029,10 @@ local function LoadMainUI()
                         local idx = _G.GoodFarmCurrentMode or 1
                         local q = _G.GoodFarmQueue[idx]
                         if q then
-                            gfStatus.Text = "▶️ [" .. q.Mode .. "] รอบ " .. (_G.GoodFarmRoundsDone or 0) .. "/" .. q.Rounds
+                            local done = _G.GoodFarmRoundsDone or 0
+                            -- ถ้าอยู่ใน Lobby และยังไม่เริ่มนับ (Done เป็น 0) ให้โชว์ว่ากำลังจะเริ่มรอบ 1
+                            -- แต่ถ้า Automation รันแล้ว Done จะถูกบวก 1 ทันที ทำให้โชว์ 1/X
+                            gfStatus.Text = "▶️ [" .. q.Mode .. "] รอบ " .. done .. "/" .. q.Rounds
                             gfStatus.TextColor3 = Colors.Green
                         end
                     else

@@ -771,7 +771,9 @@ task.spawn(function()
             _G.AutoReplay = false -- ปิด Replay เพื่อให้ AutoToLobby จัดการแทน
 
             -- [5] Join ด่านตาม Mode
-            GF_Status("🚀 เข้าด่าน " .. mode .. " รอบ " .. (_G.GoodFarmRoundsDone + 1) .. "/" .. current.Rounds)
+            _G.GoodFarmRoundsDone = (_G.GoodFarmRoundsDone or 0) + 1
+            SaveGoodFarmState()
+            GF_Status("🚀 [" .. mode .. "] กำลังเข้าด่าน รอบ " .. _G.GoodFarmRoundsDone .. "/" .. current.Rounds)
 
             if mode == "Casino" then
                 -- Copy จาก AutoJoinCasino
@@ -980,10 +982,8 @@ task.spawn(function()
             if not _G.AutoGoodFarm then return end
 
             if not GF_IsInLobby() then
-                -- วาร์ปสำเร็จ → นับรอบ +1 และบันทึกทันที!
-                _G.GoodFarmRoundsDone = (_G.GoodFarmRoundsDone or 0) + 1
-                GF_Status("✅ " .. mode .. " วาปสำเร็จ! นับรอบ: " .. _G.GoodFarmRoundsDone .. "/" .. current.Rounds)
-                SaveGoodFarmState() -- บันทึกลงไฟล์แยกทันที ห้ามรอSaveConfigใหญ่
+                -- วาร์ปสำเร็จแล้ว (สคริปต์ในเซิร์ฟเวอร์ใหม่จะเริ่มทำงานเอง)
+                GF_Status("✅ [" .. mode .. "] วาปสำเร็จ! เข้าด่านแล้ว...")
                 _G.SaveConfig()
 
                 -- รอให้สคริปต์โดน Kill ทิ้ง
