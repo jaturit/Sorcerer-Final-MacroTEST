@@ -850,8 +850,9 @@ local function LoadMainUI()
             if not entry then continue end
 
             -- Mode Row Container
+            local isEventMode = (modeInfo.key == "Event")
             local row = Instance.new("Frame", GoodFarmBox)
-            row.Size = UDim2.new(1, -25, 0, 80)
+            row.Size = UDim2.new(1, -25, 0, isEventMode and 55 or 80)
             row.BackgroundColor3 = Colors.DarkGray
             row.ZIndex = 5
             Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
@@ -904,6 +905,21 @@ local function LoadMainUI()
                 rowStroke.Color = num > 0 and Colors.Green or Color3.fromRGB(60, 60, 60)
                 SaveConfig()
             end)
+
+            -- Event: แสดงข้อความแทน dropdown
+            if isEventMode then
+                local noteLbl = Instance.new("TextLabel", row)
+                noteLbl.Text = "⚙️ ใช้การตั้งค่าจากหน้า Event"
+                noteLbl.Size = UDim2.new(1, -20, 0, 18)
+                noteLbl.Position = UDim2.new(0, 10, 0, 34)
+                noteLbl.BackgroundTransparency = 1
+                noteLbl.TextColor3 = Colors.LightGray
+                noteLbl.Font = Enum.Font.Gotham
+                noteLbl.TextSize = 10
+                noteLbl.TextXAlignment = Enum.TextXAlignment.Left
+                noteLbl.ZIndex = 6
+                continue -- ข้าม dropdown ไปเลย
+            end
 
             -- Macro Dropdown
             local macroBtn = Instance.new("TextButton", row)

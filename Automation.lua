@@ -647,24 +647,29 @@ task.spawn(function()
                 idx = nextIdx
             end
 
-            if not current or current.MacroFile == "None" or current.MacroFile == "" then
-                GF_Status("⚠️ [" .. (current and current.Mode or "?") .. "] ยังไม่ได้เลือก Macro")
-                return
+            local mode = current.Mode
+
+            -- Event mode → ระบบ Event เดิมจัดการเอง (ไม่ต้องเช็ค Macro)
+            if mode ~= "Event" then
+                if not current or current.MacroFile == "None" or current.MacroFile == "" then
+                    GF_Status("⚠️ [" .. (current and current.Mode or "?") .. "] ยังไม่ได้เลือก Macro")
+                    return
+                end
+
+                local FOLDER = _G._FOLDER
+                local macroPath = FOLDER .. "/" .. current.MacroFile .. ".json"
+
+                -- [1] สลับ macro file
+                GF_Status("📁 สลับ Macro → " .. current.MacroFile)
+                _G.SelectedFile = current.MacroFile
+                _G.SaveConfig()
+                task.wait(0.5)
+
+                -- [2] Equip ตัวละครจาก macro
+                GF_Status("🔧 Equip ตัวจากมาโคร...")
+                GoodFarmEquipFromMacro(macroPath)
+                task.wait(1)
             end
-
-            local FOLDER = _G._FOLDER
-            local macroPath = FOLDER .. "/" .. current.MacroFile .. ".json"
-
-            -- [1] สลับ macro file
-            GF_Status("📁 สลับ Macro → " .. current.MacroFile)
-            _G.SelectedFile = current.MacroFile
-            _G.SaveConfig()
-            task.wait(0.5)
-
-            -- [2] Equip ตัวละครจาก macro
-            GF_Status("🔧 Equip ตัวจากมาโคร...")
-            GoodFarmEquipFromMacro(macroPath)
-            task.wait(1)
 
             -- [3] เปิด AutoPlay + AutoToLobby
             _G.AutoPlay = true
@@ -672,7 +677,6 @@ task.spawn(function()
             _G.AutoReplay = false -- ปิด Replay เพื่อให้ AutoToLobby จัดการแทน
 
             -- [4] Join ด่านตาม Mode
-            local mode = current.Mode
             GF_Status("🚀 เข้าด่าน " .. mode .. " รอบ " .. (_G.GoodFarmRoundsDone + 1) .. "/" .. current.Rounds)
 
             if mode == "Casino" then
