@@ -1177,7 +1177,7 @@ local function LoadMainUI()
 
     local MainBox = createContainer(Page1, 550)
 
-    createToggle(MainBox, "▶️ Auto Play Macro", _G.AutoPlay, function(v)
+    _G.SetDashboardAutoPlay = createToggle(MainBox, "▶️ Auto Play Macro", _G.AutoPlay, function(v)
         _G._IsEventAutoPlay = false
         _G.AutoPlay = v
         if not v then

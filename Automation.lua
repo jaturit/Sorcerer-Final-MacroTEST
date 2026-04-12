@@ -779,7 +779,9 @@ task.spawn(function()
                 _G.SaveConfig()
             elseif mode ~= "Event" then
                 _G._IsEventAutoPlay = false
+                if _G.SetDashboardAutoPlay then _G.SetDashboardAutoPlay(true) end
                 _G.AutoPlay = true
+                if _G.RunMacroLogic then _G.RunMacroLogic() end
                 -- สลับ Macro File ให้ตรงกับที่ตั้งไว้ (ถ้าไม่ใช่เลือก None)
                 if current.MacroFile ~= "None" and current.MacroFile ~= "" then
                     _G.SelectedFile = current.MacroFile
