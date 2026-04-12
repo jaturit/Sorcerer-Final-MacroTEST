@@ -907,29 +907,25 @@ task.spawn(function()
 
             if not _G.AutoGoodFarm then return end
 
-            -- [6] รอจนกว่าจะกลับ Lobby (จบเกม) → นับรอบ
-            GF_Status("⏳ กำลังเล่น " .. mode .. "...")
-            while not GF_IsInLobby() and _G.AutoGoodFarm do
-                task.wait(2)
+            if not GF_IsInLobby() then
+                -- สคริปต์จับได้ว่าตัวละครหลุดจาก Lobby (วาปสำเร็จ)
+                -- นับรอบเลย! เพราะเดี๋ยวสคริปต์จะถูก Roblox Kill ทิ้งตอนวาร์ปเปลี่ยนด่าน
+                _G.GoodFarmRoundsDone = (_G.GoodFarmRoundsDone or 0) + 1
+                GF_Status("✅ " .. mode .. " วาปสำเร็จ! นับรอบเป็น " .. _G.GoodFarmRoundsDone .. "/" .. current.Rounds)
+                -- (No longer disabling flags here because they are needed inside the actual match)
+                -- _G.SaveConfig() will continue below to save the RoundsDone count
+                
+                _G.SaveConfig()
+                
+                -- รอให้สคริปต์โดน Kill ทิ้ง
+                while _G.AutoGoodFarm and not GF_IsInLobby() do
+                    task.wait(2)
+                end
+            else
+                GF_Status("❌ เข้าด่านไม่สำเร็จ (วาปไม่ติด) รอเริ่มใหม่...")
             end
 
-            if not _G.AutoGoodFarm then return end
-
-            -- นับรอบ
-            _G.GoodFarmRoundsDone = (_G.GoodFarmRoundsDone or 0) + 1
-            GF_Status("✅ " .. mode .. " จบรอบ " .. _G.GoodFarmRoundsDone .. "/" .. current.Rounds)
-
-            -- ปิด flags ถ้าเพิ่งเล่น Event/Casino mode (ไม่ให้ค้างไปโหมดอื่น)
-            if mode == "Event" then
-                _G.AutoEvent = false
-                _G.AutoEventMacro = false
-            elseif mode == "Casino" then
-                _G.AutoCasinoEnabled = false
-                _G.AutoCasinoPlay = false
-            end
-
-            _G.SaveConfig()
-            task.wait(3) -- รอ lobby โหลด
+            task.wait(3) -- รอจัดคิวรอบใหม่
         end)
         task.wait(3)
     end

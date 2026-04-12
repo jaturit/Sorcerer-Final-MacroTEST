@@ -777,6 +777,17 @@ local function LoadMainUI()
             SaveConfig()
         end)
 
+        -- Reset Button
+        createButton(GoodFarmBox, "🔄 Reset รอบเป็น 0 และเริ่มใหม่", "ล้างจำนวนรอบปัจจุบันให้เริ่มนับใหม่ตั้งแต่คิวแรก", function()
+            _G.GoodFarmRoundsDone = 0
+            _G.GoodFarmCurrentMode = 1
+            SaveConfig()
+            if _G._GoodFarmStatusLabel then
+                _G._GoodFarmStatusLabel.Text = "🔄 รีเซ็ตคิวทั้งหมด เริ่มนับใหม่แล้ว!"
+            end
+            print("✅ รีเซ็ตจำนวนรอบ Good Farm แล้ว")
+        end)
+
         -- Status Label
         local gfStatus = Instance.new("TextLabel", GoodFarmBox)
         gfStatus.Name = "GoodFarmStatus"
@@ -1967,7 +1978,12 @@ local function LoadMainUI()
     local _CapturedTraitUUID = nil
     task.spawn(function()
         pcall(function()
-            local remote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Traits"):WaitForChild("RollTrait")
+            local remotes = game:GetService("ReplicatedStorage"):WaitForChild("Remotes", 5)
+            local remote = nil
+            if remotes and remotes:FindFirstChild("Traits") then
+                remote = remotes.Traits:FindFirstChild("RollTrait")
+            end
+            if not remote then return end
             local mt = getrawmetatable(remote)
             if mt then
                 local oldNamecall = mt.__namecall
@@ -3549,41 +3565,50 @@ local function LoadMainUI()
         end
     end)
 
-    local setCasinoPlayToggle = createToggle(CasinoPlayBox, "▶️ Auto Play Casino Macro", _G.AutoCasinoEnabled, function(v)
+    local function startCasinoLoop()
+        if CasinoSelectedFile == "None" then
+            casinoPlayStatus.Text = "❌ เลือกไฟล์ก่อน"
+            _G.AutoCasinoEnabled = false
+            _G.AutoCasinoPlay = false
+            SaveConfig()
+            if setCasinoPlayToggle then setCasinoPlayToggle(false) end
+            return
+        end
+        task.spawn(function()
+            while _G.AutoCasinoEnabled do
+                local f = _G.CasinoSelectedFile or CasinoSelectedFile
+                if f == "None" or f == "" then break end
+                _G.AutoCasinoPlay = true
+                casinoPlayStatus.Text = "▶️ กำลังเล่น: " .. f
+                RunCasinoMacroLogic()
+                _G.AutoCasinoPlay = false
+                if _G.AutoCasinoEnabled then
+                    casinoPlayStatus.Text = "🔄 จบรอบ รอรอบถัดไป..."
+                    task.wait(5)
+                else
+                    casinoPlayStatus.Text = "✅ จบแล้ว"
+                    if setCasinoPlayToggle then setCasinoPlayToggle(false) end
+                end
+            end
+        end)
+    end
+
+    setCasinoPlayToggle = createToggle(CasinoPlayBox, "▶️ Auto Play Casino Macro", _G.AutoCasinoEnabled, function(v)
         _G.AutoCasinoEnabled = v
         _G.AutoCasinoPlay = v
         SaveConfig()
         if v then
-            if CasinoSelectedFile == "None" then
-                casinoPlayStatus.Text = "❌ เลือกไฟล์ก่อน"
-                _G.AutoCasinoEnabled = false
-                _G.AutoCasinoPlay = false
-                SaveConfig()
-                return
-            end
-            task.spawn(function()
-                while _G.AutoCasinoEnabled do
-                    local f = _G.CasinoSelectedFile or CasinoSelectedFile
-                    if f == "None" or f == "" then break end
-                    _G.AutoCasinoPlay = true
-                    casinoPlayStatus.Text = "▶️ กำลังเล่น: " .. f
-                    RunCasinoMacroLogic()
-                    _G.AutoCasinoPlay = false
-                    if _G.AutoCasinoEnabled then
-                        casinoPlayStatus.Text = "🔄 จบรอบ รอรอบถัดไป..."
-                        task.wait(5)
-                    else
-                        casinoPlayStatus.Text = "✅ จบแล้ว"
-                        if setCasinoPlayToggle then setCasinoPlayToggle(false) end
-                    end
-                end
-            end)
+            startCasinoLoop()
         else
             _G.AutoCasinoPlay = false
             SaveConfig()
             casinoPlayStatus.Text = "⏹️ หยุดแล้ว"
         end
     end)
+    
+    if _G.AutoCasinoEnabled then
+        startCasinoLoop()
+    end
 
     -- 2. RECORD CASINO MACRO
     local CasinoRecBox = createContainer(Page5, 210)
