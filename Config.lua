@@ -20,6 +20,7 @@ local CASINO_FOLDER = FOLDER.."/Casino_Macros"
 local AUTH_FILE = FOLDER.."/user_auth.json"
 local CONFIG_FILE = FOLDER.."/settings.json"
 local MAP_CONFIG_FILE = FOLDER.."/map_macros.json"
+local GOODFARM_STATE_FILE = FOLDER.."/goodfarm_state.json"
 
 pcall(function()
     if not isfolder(FOLDER) then makefolder(FOLDER) end
@@ -39,6 +40,7 @@ _G._Player = Player
 _G._PlayerGui = PlayerGui
 _G._FOLDER = FOLDER
 _G._CASINO_FOLDER = CASINO_FOLDER
+_G._GOODFARM_STATE_FILE = GOODFARM_STATE_FILE
 _G._AUTH_FILE = AUTH_FILE
 _G._CONFIG_FILE = CONFIG_FILE
 _G._MAP_CONFIG_FILE = MAP_CONFIG_FILE

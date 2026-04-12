@@ -630,6 +630,38 @@ local function GF_FindNextMode(startIdx)
     return nil
 end
 
+-- 📂 ระบบบันทึกความคืบหน้า GoodFarm แยกไฟล์ (Persistent State)
+local function SaveGoodFarmState()
+    pcall(function()
+        local state = {
+            CurrentIdx = _G.GoodFarmCurrentMode or 1,
+            RoundsDone = _G.GoodFarmRoundsDone or 0,
+            LastQueueLength = #(_G.GoodFarmQueue or {})
+        }
+        writefile(_G._GOODFARM_STATE_FILE, game:GetService("HttpService"):JSONEncode(state))
+    end)
+end
+
+local function LoadGoodFarmState()
+    pcall(function()
+        if isfile(_G._GOODFARM_STATE_FILE) then
+            local data = game:GetService("HttpService"):JSONDecode(readfile(_G._GOODFARM_STATE_FILE))
+            -- ถ้าขนาดคิวไม่เท่าเดิม (มีการแก้ไขคิว) ให้รีเซ็ตใหม่เพื่อป้องกัน Index เพี้ยน
+            if data.LastQueueLength == #(_G.GoodFarmQueue or {}) then
+                _G.GoodFarmCurrentMode = data.CurrentIdx or 1
+                _G.GoodFarmRoundsDone = data.RoundsDone or 0
+            else
+                _G.GoodFarmRoundsDone = 0
+                _G.GoodFarmCurrentMode = 1
+                SaveGoodFarmState()
+            end
+        end
+    end)
+end
+
+-- เรียกโหลดทันทีเมื่อโหลดสคริปต์ (เพราะวาร์ปคือการเริ่มสคริปต์ใหม่)
+LoadGoodFarmState()
+
 -- Main GoodFarm Loop
 task.spawn(function()
     while true do
@@ -637,12 +669,13 @@ task.spawn(function()
             if not _G.AutoGoodFarm then return end
             if not GF_IsInLobby() then return end
 
-            -- หา mode ปัจจุบัน
+            -- ดึง State ล่าสุดจากไฟล์ทุกรอบลูป (กันเหนียว)
+            LoadGoodFarmState()
+            
             local idx = _G.GoodFarmCurrentMode or 1
             local queue = _G.GoodFarmQueue
             if not queue or #queue == 0 then return end
 
-            -- หา mode ที่มี Rounds > 0 (active)
             local function GF_FindAnyActiveMode(startIdx)
                 for i = 1, #queue do
                     local ni = ((startIdx - 1 + i - 1) % #queue) + 1
@@ -657,14 +690,22 @@ task.spawn(function()
             if not current or current.Rounds <= 0 or (_G.GoodFarmRoundsDone >= current.Rounds) then
                 _G.GoodFarmRoundsDone = 0
                 local nextIdx = GF_FindAnyActiveMode(idx + 1)
-                if not nextIdx then
-                    nextIdx = GF_FindAnyActiveMode(1)
-                end
-                if not nextIdx then
-                    GF_Status("⚠️ ไม่มี Mode ที่เปิดใช้งานในคิว")
+                
+                -- ถ้าหาโหมดถัดไปแบบวนลูป (startIdx+1...end...1...startIdx) แล้วยังไม่เจอ
+                -- หรือถ้ามันวนกลับมาที่จุดเดิมและจุดเดิมก็เสร็จแล้ว แปลว่า "จบทุกคิวแล้ว"
+                if not nextIdx or (nextIdx == idx and _G.GoodFarmRoundsDone >= current.Rounds) then
+                    -- จบทุกคิว: รีเซ็ตทุกอย่างกลับไปเริ่มคิว 1 ใหม่ตามคำขอ USER
+                    GF_Status("⭐ จบทุกคิวแล้ว! เริ่มต้นวนรอบใหม่จากคิวที่ 1...")
+                    _G.GoodFarmCurrentMode = GF_FindAnyActiveMode(1) or 1
+                    _G.GoodFarmRoundsDone = 0
+                    SaveGoodFarmState()
+                    _G.SaveConfig()
                     return
                 end
+                
                 _G.GoodFarmCurrentMode = nextIdx
+                _G.GoodFarmRoundsDone = 0
+                SaveGoodFarmState()
                 _G.SaveConfig()
                 current = queue[nextIdx]
                 idx = nextIdx
@@ -939,22 +980,23 @@ task.spawn(function()
             if not _G.AutoGoodFarm then return end
 
             if not GF_IsInLobby() then
-                -- วาร์ปสำเร็จ → นับรอบ +1
+                -- วาร์ปสำเร็จ → นับรอบ +1 และบันทึกทันที!
                 _G.GoodFarmRoundsDone = (_G.GoodFarmRoundsDone or 0) + 1
                 GF_Status("✅ " .. mode .. " วาปสำเร็จ! นับรอบ: " .. _G.GoodFarmRoundsDone .. "/" .. current.Rounds)
+                SaveGoodFarmState() -- บันทึกลงไฟล์แยกทันที ห้ามรอSaveConfigใหญ่
                 _G.SaveConfig()
 
-                -- รอให้สคริปต์โดน Kill ทิ้ง (hoist: เดี๋ยวสคริปต์สื๊ออัตโนมัติตอนสลับ Roblox Server)
+                -- รอให้สคริปต์โดน Kill ทิ้ง
                 while _G.AutoGoodFarm and not GF_IsInLobby() do
                     task.wait(2)
                 end
 
-                -- กลับมา Lobby แล้ว
+                -- ถ้ากลับมา Lobby (เช่นกรณีจบเกมแล้ววาปกลับมา)
                 if _G.AutoGoodFarm then
                     -- ตรวจว่าครบรอบแล้วไหม
                     if _G.GoodFarmRoundsDone >= current.Rounds then
-                        -- ครบรอบ! ปิด flag ที่เกี่ยวกับ mode นี้ และเลื่อนไป mode ถัดไป
-                        GF_Status("🏆 " .. mode .. " ครบ " .. current.Rounds .. " รอบแล้ว! ปิด auto และสลับ mode...")
+                        -- ครบรอบ! ปิด flag และเลื่อนไป mode ถัดไป
+                        GF_Status("🏆 " .. mode .. " ครบ " .. current.Rounds .. " รอบแล้ว! เตรียมสลับ mode...")
                         _G.AutoCasinoEnabled = false
                         _G.AutoCasinoPlay = false
                         _G.AutoJoinCasino = false
@@ -963,19 +1005,18 @@ task.spawn(function()
                         _G.AutoEventEquip = false
                         _G.AutoPlay = false
                         _G.GoodFarmRoundsDone = 0
+                        SaveGoodFarmState()
                         _G.SaveConfig()
 
                         local nextIdx = GF_FindAnyActiveMode(idx + 1)
                         if not nextIdx then nextIdx = GF_FindAnyActiveMode(1) end
                         if nextIdx then
                             _G.GoodFarmCurrentMode = nextIdx
+                            SaveGoodFarmState()
                             _G.SaveConfig()
                             GF_Status("🔄 สลับไป mode: " .. queue[nextIdx].Mode)
-                        else
-                            GF_Status("⚠️ ไม่มี mode ถัดไปในคิว")
                         end
                     end
-                    -- ยังไม่ครบรอบ → เดินหน้าลูปเปิดใหม่โดยไม่ต้องทำอะไร
                 end
             else
                 GF_Status("❌ เข้าด่านไม่สำเร็จ (วาปไม่ติด) รอเริ่มใหม่...")
@@ -992,5 +1033,6 @@ end)
 -- ═══════════════════════════════════════════════════════
 
 _G.SendGameEndNotification = SendGameEndNotification
+_G.SaveGoodFarmState = SaveGoodFarmState
 
 print("✅ [Module 6/12] Automation.lua loaded successfully")

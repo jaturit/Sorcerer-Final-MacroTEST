@@ -773,6 +773,7 @@ local function LoadMainUI()
             if not v then
                 _G.GoodFarmRoundsDone = 0
                 _G.GoodFarmCurrentMode = 1
+                if _G.SaveGoodFarmState then _G.SaveGoodFarmState() end
             end
             SaveConfig()
         end)
@@ -782,6 +783,7 @@ local function LoadMainUI()
             _G.GoodFarmRoundsDone = 0
             _G.GoodFarmCurrentMode = 1
             SaveConfig()
+            if _G.SaveGoodFarmState then _G.SaveGoodFarmState() end
             if _G._GoodFarmStatusLabel then
                 _G._GoodFarmStatusLabel.Text = "🔄 รีเซ็ตคิวทั้งหมด เริ่มนับใหม่แล้ว!"
             end
