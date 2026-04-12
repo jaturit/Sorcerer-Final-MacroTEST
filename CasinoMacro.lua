@@ -206,10 +206,15 @@ local function RunCasinoMacroLogic()
 
         if act.Type == "Spawn" then
             -- รอเงินพอก่อน (NO SKIP - รอจนกว่าจะพอ)
+            local _waitSpwnTick = 0
             while _G.AutoCasinoPlay do
                 local money = 0
                 pcall(function() money = Player.leaderstats.Money.Value end)
                 if money >= (act.Price or 0) then break end
+                if _waitSpwnTick % 10 == 0 then
+                    print("⏳ รอเงินเพื่อนวางตัว: " .. (act.TowerID or "Unknown") .. " | มีเงิน: " .. money .. " | ขาด: " .. ((act.Price or 0) - money))
+                end
+                _waitSpwnTick = _waitSpwnTick + 1
                 task.wait(0.5)
             end
             if not _G.AutoCasinoPlay then break end
@@ -405,10 +410,15 @@ local function RunCasinoMacroLogic()
             if GameTowers[act.Index] then
                 -- รอเงินพอก่อน
                 local neededMoney = (act.Price or 0) + 50
+                local _waitUpTick = 0
                 while _G.AutoCasinoPlay do
                     local money = 0
                     pcall(function() money = Player.leaderstats.Money.Value end)
                     if money >= neededMoney then break end
+                    if _waitUpTick % 10 == 0 then
+                        print("⏳ รอเงินอัปเกรด idx:" .. act.Index .. " | มีเงิน: " .. money .. " | ต้องมี: " .. neededMoney)
+                    end
+                    _waitUpTick = _waitUpTick + 1
                     task.wait(0.5)
                 end
                 if not _G.AutoCasinoPlay then break end
