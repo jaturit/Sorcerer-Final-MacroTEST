@@ -778,7 +778,12 @@ task.spawn(function()
                 _G.AutoCasinoPlay = true
                 _G.SaveConfig()
             elseif mode ~= "Event" then
+                _G._IsEventAutoPlay = false
                 _G.AutoPlay = true
+                -- สลับ Macro File ให้ตรงกับที่ตั้งไว้ (ถ้าไม่ใช่เลือก None)
+                if current.MacroFile ~= "None" and current.MacroFile ~= "" then
+                    _G.SelectedFile = current.MacroFile
+                end
             end
             
             _G.AutoToLobby = true
