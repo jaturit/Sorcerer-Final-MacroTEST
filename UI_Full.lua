@@ -3079,6 +3079,19 @@ local function LoadMainUI()
                 continue
             end
 
+            -- 🛡️ [GoodFarm Safeguard] ตรวจสอบว่าครบรอบหรือยัง ถ้าครบแล้วห้าม Join ต่อ
+            if _G.AutoGoodFarm then
+                local idx = _G.GoodFarmCurrentMode or 1
+                local q = (_G.GoodFarmQueue or {})[idx]
+                if q and q.Mode == "Event" and q.Rounds > 0 and (_G.GoodFarmRoundsDone or 0) >= q.Rounds then
+                    _G.AutoEvent = false
+                    _G.AutoEventMacro = false
+                    _G.AutoEventEquip = false
+                    task.wait(0.5)
+                    continue
+                end
+            end
+
             -- เช็คว่าตัวละครยังอยู่ไหม
             local char = Player.Character
             local rootPart = char and char:FindFirstChild("HumanoidRootPart")
@@ -3550,6 +3563,16 @@ local function LoadMainUI()
             repeat task.wait(1) waitGame = waitGame + 1 until Player:FindFirstChild("leaderstats") or waitGame >= 30
             -- Loop รันซ้ำตราบใดที่ AutoCasinoEnabled ยังเปิด
             while _G.AutoCasinoEnabled do
+                -- 🛡️ [GoodFarm Safeguard] ตรวจสอบว่าครบรอบหรือยัง
+                if _G.AutoGoodFarm then
+                    local idx = _G.GoodFarmCurrentMode or 1
+                    local q = (_G.GoodFarmQueue or {})[idx]
+                    if q and q.Mode == "Casino" and q.Rounds > 0 and (_G.GoodFarmRoundsDone or 0) >= q.Rounds then
+                        _G.AutoCasinoEnabled = false
+                        _G.AutoCasinoPlay = false
+                        break
+                    end
+                end
                 local f = _G.CasinoSelectedFile or CasinoSelectedFile
                 if f == "None" or f == "" then break end
                 _G.AutoCasinoPlay = true
@@ -3582,6 +3605,16 @@ local function LoadMainUI()
         end
         task.spawn(function()
             while _G.AutoCasinoEnabled do
+                -- 🛡️ [GoodFarm Safeguard] ตรวจสอบว่าครบรอบหรือยัง
+                if _G.AutoGoodFarm then
+                    local idx = _G.GoodFarmCurrentMode or 1
+                    local q = (_G.GoodFarmQueue or {})[idx]
+                    if q and q.Mode == "Casino" and q.Rounds > 0 and (_G.GoodFarmRoundsDone or 0) >= q.Rounds then
+                        _G.AutoCasinoEnabled = false
+                        _G.AutoCasinoPlay = false
+                        break
+                    end
+                end
                 local f = _G.CasinoSelectedFile or CasinoSelectedFile
                 if f == "None" or f == "" then break end
                 _G.AutoCasinoPlay = true

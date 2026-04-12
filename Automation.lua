@@ -650,6 +650,20 @@ local function LoadGoodFarmState()
             if data.LastQueueLength == #(_G.GoodFarmQueue or {}) then
                 _G.GoodFarmCurrentMode = data.CurrentIdx or 1
                 _G.GoodFarmRoundsDone = data.RoundsDone or 0
+
+                -- 🛡️ [Pre-emptive Safeguard] ถ้าครบรอบแล้ว ให้สั่งปิด Flag ทันทีป้องกันลูปอื่น Join ทับ
+                local idx = _G.GoodFarmCurrentMode
+                local q = (_G.GoodFarmQueue or {})[idx]
+                if q and q.Rounds > 0 and _G.GoodFarmRoundsDone >= q.Rounds then
+                    _G.AutoEvent = false
+                    _G.AutoEventMacro = false
+                    _G.AutoEventEquip = false
+                    _G.AutoJoinCasino = false
+                    _G.AutoCasinoPlay = false
+                    _G.AutoCasinoEnabled = false
+                    _G.AutoPlay = false
+                    -- ไม่ต้อง Save JSON ตรงนี้ เพราะเราแค่ปิด Flag ชั่วคราวให้ Manager มาจัดการต่อ
+                end
             else
                 _G.GoodFarmRoundsDone = 0
                 _G.GoodFarmCurrentMode = 1
