@@ -151,11 +151,12 @@ local CasinoPlacedTowers = {}
 local CasinoSelectedFile = "None" -- จะ sync กับ _G.CasinoSelectedFile หลัง LoadConfig
 
 local function SaveCasinoMacro()
-    if CasinoSelectedFile == "None" or CasinoSelectedFile == "" then return end
+    local fileToSave = _G.CasinoSelectedFile or CasinoSelectedFile
+    if fileToSave == "None" or fileToSave == "" then return end
     pcall(function()
-        writefile(CASINO_FOLDER.."/"..CasinoSelectedFile..".json", HttpService:JSONEncode(CasinoCurrentData))
+        writefile(CASINO_FOLDER.."/"..fileToSave..".json", HttpService:JSONEncode(CasinoCurrentData))
     end)
-    print("💾 Casino Macro saved: "..CasinoSelectedFile.." | Actions: "..#CasinoCurrentData)
+    print("💾 Casino Macro saved: "..fileToSave.." | Actions: "..#CasinoCurrentData)
 end
 
 local function LoadCasinoMacro(fileName)
@@ -168,11 +169,12 @@ local function LoadCasinoMacro(fileName)
 end
 
 local function RunCasinoMacroLogic()
-    if CasinoSelectedFile == "None" then
+    local activeFile = _G.CasinoSelectedFile or CasinoSelectedFile
+    if activeFile == "None" then
         print("❌ ยังไม่ได้เลือกไฟล์ Casino Macro")
         return
     end
-    local data = LoadCasinoMacro(CasinoSelectedFile)
+    local data = LoadCasinoMacro(activeFile)
     if not data or #data == 0 then
         print("❌ ไฟล์ Casino Macro ว่างหรือโหลดไม่ได้")
         return
