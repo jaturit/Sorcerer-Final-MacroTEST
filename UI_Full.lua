@@ -851,8 +851,11 @@ local function LoadMainUI()
 
             -- Mode Row Container
             local isEventMode = (modeInfo.key == "Event")
+            local isCasinoMode = (modeInfo.key == "Casino")
+            local isSpecialMode = isEventMode or isCasinoMode
+
             local row = Instance.new("Frame", GoodFarmBox)
-            row.Size = UDim2.new(1, -25, 0, isEventMode and 55 or 80)
+            row.Size = UDim2.new(1, -25, 0, isSpecialMode and 55 or 80)
             row.BackgroundColor3 = Colors.DarkGray
             row.ZIndex = 5
             Instance.new("UICorner", row).CornerRadius = UDim.new(0, 8)
@@ -906,10 +909,10 @@ local function LoadMainUI()
                 SaveConfig()
             end)
 
-            -- Event: แสดงข้อความแทน dropdown
-            if isEventMode then
+            -- Event/Casino: แสดงข้อความแทน dropdown
+            if isSpecialMode then
                 local noteLbl = Instance.new("TextLabel", row)
-                noteLbl.Text = "⚙️ ใช้การตั้งค่าจากหน้า Event"
+                noteLbl.Text = isEventMode and "⚙️ ใช้การตั้งค่าจากหน้า Event" or "⚙️ ใช้การตั้งค่าจากหน้า Casino"
                 noteLbl.Size = UDim2.new(1, -20, 0, 18)
                 noteLbl.Position = UDim2.new(0, 10, 0, 34)
                 noteLbl.BackgroundTransparency = 1

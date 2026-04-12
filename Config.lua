@@ -246,7 +246,8 @@ local function SaveConfig()
             AutoRejoinPS = _G.AutoRejoinPS,
             AutoGoodFarm = _G.AutoGoodFarm,
             GoodFarmQueue = _G.GoodFarmQueue,
-            GoodFarmCurrentMode = _G.GoodFarmCurrentMode
+            GoodFarmCurrentMode = _G.GoodFarmCurrentMode,
+            GoodFarmRoundsDone = _G.GoodFarmRoundsDone
         }
         writefile(CONFIG_FILE, HttpService:JSONEncode(cfg))
     end)
@@ -289,6 +290,7 @@ local function LoadConfig()
             _G.PrivateServerLink = data.PrivateServerLink or ""
             _G.AutoRejoinPS = data.AutoRejoinPS or false
             _G.AutoGoodFarm = data.AutoGoodFarm or false
+            _G.GoodFarmRoundsDone = data.GoodFarmRoundsDone or 0
             if data.GoodFarmQueue then
                 _G.GoodFarmQueue = data.GoodFarmQueue
                 -- เช็ค mode ที่ขาดแล้วเติมให้อัตโนมัติ (กรณี config เก่าไม่มี mode ใหม่)

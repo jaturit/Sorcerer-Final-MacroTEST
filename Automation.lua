@@ -517,11 +517,11 @@ local function GoodFarmEquipFromMacro(macroPath)
         local equipRemote = RS.Remotes.Towers.EquipTower
         local unequipRemote = RS.Remotes.Towers.UnequipTower
 
-        -- อ่าน UUID/TowerID จาก macro (รองรับทั้ง 2 format)
-        local uniqueUUIDs = {}   -- UUID สำหรับ equip (จาก macro ปกติ)
-        local towerIDNames = {}  -- ชื่อ Tower (จาก casino macro)
+        -- อ่าน UUID จาก macro (รองรับทั้ง macro ปกติ + casino)
+        -- macro ปกติ: act.TowerName = UUID
+        -- casino macro: act.TowerID = UUID
+        local uniqueUUIDs = {}
         local seenUUID = {}
-        local isCasinoFormat = false
 
         local macroData = HttpService:JSONDecode(readfile(macroPath))
         local actions = macroData
@@ -529,75 +529,16 @@ local function GoodFarmEquipFromMacro(macroPath)
         if type(actions) == "table" then
             for _, act in ipairs(actions) do
                 if act.Type == "Spawn" then
-                    -- Macro ปกติ: มี TowerName = UUID (มี "-" ข้างใน)
-                    -- Casino macro: มี TowerID = ชื่อ tower type
-                    local uuid = act.TowerName or (act.Args and act.Args[1])
-                    local towerID = act.TowerID
-
-                    if uuid and uuid:find("-") and not seenUUID[uuid] then
-                        -- UUID format (macro ปกติ)
+                    local uuid = act.TowerName or act.TowerID or (act.Args and act.Args[1])
+                    if uuid and not seenUUID[uuid] then
                         seenUUID[uuid] = true
                         table.insert(uniqueUUIDs, uuid)
-                    elseif towerID and not seenUUID[towerID] then
-                        -- Casino format: ต้องไป match กับ Inventory
-                        seenUUID[towerID] = true
-                        table.insert(towerIDNames, towerID)
-                        isCasinoFormat = true
-                    elseif uuid and not uuid:find("-") and not seenUUID[uuid] then
-                        -- TowerName แต่ไม่ใช่ UUID (อาจเป็น format พิเศษ)
-                        seenUUID[uuid] = true
-                        table.insert(towerIDNames, uuid)
-                        isCasinoFormat = true
                     end
                 end
             end
         end
 
-        print("🌾 [GoodFarm] UUID จาก macro: " .. #uniqueUUIDs .. " | TowerID จาก casino: " .. #towerIDNames)
-
-        -- ถ้าเป็น Casino format → ค้นหา UUID จาก Inventory ที่ match ชื่อ TowerID
-        if isCasinoFormat and #towerIDNames > 0 then
-            pcall(function()
-                local invGui = Player.PlayerGui:FindFirstChild("Inventory")
-                if invGui then
-                    local towersFrame = invGui:FindFirstChild("Towers")
-                    if towersFrame then
-                        for _, towerName in ipairs(towerIDNames) do
-                            local found = false
-                            for _, slot in pairs(towersFrame:GetChildren()) do
-                                if slot:IsA("Frame") or slot:IsA("ImageButton") or slot:IsA("TextButton") then
-                                    -- เช็คชื่อ tower ในแต่ละ slot
-                                    local nameLabel = slot:FindFirstChild("TowerName") or slot:FindFirstChild("Name")
-                                    local slotName = slot.Name
-                                    -- ถ้าชื่อ slot เป็น UUID และมี label ที่ match กับ towerName
-                                    if slotName:find("-") and #slotName > 20 then
-                                        -- ลองจับจาก attribute หรือ child ที่มีชื่อ tower
-                                        local matchFound = false
-                                        pcall(function()
-                                            for _, child in pairs(slot:GetDescendants()) do
-                                                if child:IsA("TextLabel") and child.Text and child.Text:lower():find(towerName:lower()) then
-                                                    matchFound = true
-                                                end
-                                            end
-                                        end)
-                                        if matchFound and not seenUUID["uuid_" .. slotName] then
-                                            seenUUID["uuid_" .. slotName] = true
-                                            table.insert(uniqueUUIDs, slotName)
-                                            print("🌾 [GoodFarm] Casino match: " .. towerName .. " → " .. slotName:sub(1, 12) .. "...")
-                                            found = true
-                                            break
-                                        end
-                                    end
-                                end
-                            end
-                            if not found then
-                                print("⚠️ [GoodFarm] ไม่เจอ tower '" .. towerName .. "' ใน Inventory")
-                            end
-                        end
-                    end
-                end
-            end)
-        end
+        print("🌾 [GoodFarm] UUID จาก macro: " .. #uniqueUUIDs .. " ตัว")
 
         if #uniqueUUIDs == 0 then
             print("⚠️ [GoodFarm] ไม่มี tower ที่ต้อง equip (ข้ามขั้นตอน equip)")
@@ -722,8 +663,8 @@ task.spawn(function()
 
             local mode = current.Mode
 
-            -- Event mode → ระบบ Event เดิมจัดการเอง (ไม่ต้องเช็ค Macro)
-            if mode ~= "Event" then
+            -- Event/Casino mode → ระบบเดิมจัดการตัวเอง (ไม่ต้องเช็ค Macro จากหน้า Good Farm)
+            if mode ~= "Event" and mode ~= "Casino" then
                 if not current or current.MacroFile == "None" or current.MacroFile == "" then
                     GF_Status("⚠️ [" .. (current and current.Mode or "?") .. "] ยังไม่ได้เลือก Macro")
                     return
@@ -738,14 +679,33 @@ task.spawn(function()
                 _G.SaveConfig()
                 task.wait(0.5)
 
-                -- [2] Equip ตัวละครจาก macro
+                -- [2] Equip ตัวละครจาก macro ปกติ
                 GF_Status("🔧 Equip ตัวจากมาโคร...")
                 GoodFarmEquipFromMacro(macroPath)
                 task.wait(1)
+            elseif mode == "Casino" then
+                -- พิเศษสำหรับ Casino: ระบบเดิมไม่มี Auto Equip หน้า UI, ให้ Good Farm ดึงมาใส่ให้
+                local casinoFile = _G.CasinoSelectedFile
+                if casinoFile and casinoFile ~= "None" and casinoFile ~= "" then
+                    local casinoMacroPath = _G._CASINO_FOLDER .. "/" .. casinoFile .. ".json"
+                    if isfile(casinoMacroPath) then
+                        GF_Status("🔧 Equip ตัวสำหรับ Casino (ดึงจากไฟล์ Casino)...")
+                        GoodFarmEquipFromMacro(casinoMacroPath)
+                        task.wait(1)
+                    end
+                end
             end
 
-            -- [3] เปิด AutoPlay + AutoToLobby
-            _G.AutoPlay = true
+            -- [3] เปิด AutoPlay ตามโหมด
+            if mode == "Casino" then
+                GF_Status("🃏 เปิดระบบ Auto Casino...")
+                _G.AutoCasinoEnabled = true
+                _G.AutoCasinoPlay = true
+                _G.SaveConfig()
+            elseif mode ~= "Event" then
+                _G.AutoPlay = true
+            end
+            
             _G.AutoToLobby = true
             _G.AutoReplay = false -- ปิด Replay เพื่อให้ AutoToLobby จัดการแทน
 
@@ -959,10 +919,13 @@ task.spawn(function()
             _G.GoodFarmRoundsDone = (_G.GoodFarmRoundsDone or 0) + 1
             GF_Status("✅ " .. mode .. " จบรอบ " .. _G.GoodFarmRoundsDone .. "/" .. current.Rounds)
 
-            -- ปิด Event flags ถ้าเพิ่งเล่น Event mode (ไม่ให้ค้างไปโหมดอื่น)
+            -- ปิด flags ถ้าเพิ่งเล่น Event/Casino mode (ไม่ให้ค้างไปโหมดอื่น)
             if mode == "Event" then
                 _G.AutoEvent = false
                 _G.AutoEventMacro = false
+            elseif mode == "Casino" then
+                _G.AutoCasinoEnabled = false
+                _G.AutoCasinoPlay = false
             end
 
             _G.SaveConfig()
