@@ -800,6 +800,7 @@ local function LoadMainUI()
             { key = "Event",       label = "🎪 Event Mode" },
             { key = "RaidMeguna",  label = "⚔️ Raid Meguna" },
             { key = "RaidGojo",    label = "⚡ Raid Gojo" },
+            { key = "InfiniteNew", label = "🌀 Infinite New" },
             { key = "Casino",      label = "🎰 Casino" },
             { key = "StoryHell15", label = "📖 Story Hell 15" },
         }
@@ -812,14 +813,31 @@ local function LoadMainUI()
             return nil
         end
 
-        -- Helper: list macro files from FOLDER
+        -- Helper: list macro files from FOLDER (copied filter from existing file selector)
         local function listMacroFiles()
             local files = {}
             pcall(function()
                 for _, file in pairs(listfiles(FOLDER)) do
-                    local name = file:match("([^/\\]+)$")
-                    if name and name:match("%.json$") and not name:match("^config") and not name:match("^map_macros") and not name:match("^story_towers") and not name:match("^card_blacklist") and not name:match("^dashboard_cache") and not name:match("^event_colony") then
-                        table.insert(files, name:gsub("%.json$", ""))
+                    if file:sub(-5) == ".json" then
+                        local fileName = file:lower()
+                        local isSystemFile = fileName:find("user_auth")
+                            or fileName:find("settings")
+                            or fileName:find("std_auth")
+                            or fileName:find("auth")
+                            or fileName:find("config")
+                            or fileName:find("_backup")
+                            or fileName:find("map_macros")
+                            or fileName:find("story_towers")
+                            or fileName:find("card_blacklist")
+                            or fileName:find("dashboard_cache")
+                            or fileName:find("event_colony")
+                        if not isSystemFile then
+                            local n = file:match("[^/\\]+$") or file
+                            n = n:gsub("%.json$", "")
+                            if n:sub(1,1) ~= "_" and n:sub(1,1) ~= "." then
+                                table.insert(files, n)
+                            end
+                        end
                     end
                 end
             end)

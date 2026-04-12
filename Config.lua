@@ -78,6 +78,7 @@ _G.GoodFarmQueue = {
     { Mode = "Event",       Rounds = 0, MacroFile = "None" },
     { Mode = "RaidMeguna",  Rounds = 0, MacroFile = "None" },
     { Mode = "RaidGojo",    Rounds = 0, MacroFile = "None" },
+    { Mode = "InfiniteNew", Rounds = 0, MacroFile = "None" },
     { Mode = "Casino",      Rounds = 0, MacroFile = "None" },
     { Mode = "StoryHell15", Rounds = 0, MacroFile = "None" },
 }
@@ -288,7 +289,20 @@ local function LoadConfig()
             _G.PrivateServerLink = data.PrivateServerLink or ""
             _G.AutoRejoinPS = data.AutoRejoinPS or false
             _G.AutoGoodFarm = data.AutoGoodFarm or false
-            if data.GoodFarmQueue then _G.GoodFarmQueue = data.GoodFarmQueue end
+            if data.GoodFarmQueue then
+                _G.GoodFarmQueue = data.GoodFarmQueue
+                -- เช็ค mode ที่ขาดแล้วเติมให้อัตโนมัติ (กรณี config เก่าไม่มี mode ใหม่)
+                local defaultModes = {"Event","RaidMeguna","RaidGojo","InfiniteNew","Casino","StoryHell15"}
+                for _, modeName in ipairs(defaultModes) do
+                    local found = false
+                    for _, q in ipairs(_G.GoodFarmQueue) do
+                        if q.Mode == modeName then found = true; break end
+                    end
+                    if not found then
+                        table.insert(_G.GoodFarmQueue, { Mode = modeName, Rounds = 0, MacroFile = "None" })
+                    end
+                end
+            end
             _G.GoodFarmCurrentMode = data.GoodFarmCurrentMode or 1
         end
     end)

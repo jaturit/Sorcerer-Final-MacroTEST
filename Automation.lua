@@ -773,42 +773,53 @@ task.spawn(function()
                 end
 
             elseif mode == "Event" then
-                -- Copy จาก Event elevator logic
-                local elevators = workspace:FindFirstChild("CullingGamesTeleporters")
-                if elevators then
-                    for elevNum = 1, 6 do
-                        if not _G.AutoGoodFarm then break end
-                        local elev = elevators:FindFirstChild("Elevator" .. elevNum)
-                        if not elev then continue end
-                        local tps = elev:FindFirstChild("Teleports")
-                        local entrance = tps and tps:FindFirstChild("Entrance")
-                        if not entrance then continue end
+                -- ใช้ระบบ AutoEvent เดิมจัดการทั้งหมด (หาตู้ เลือกการ์ด equip เล่น macro)
+                -- แค่เปิด flag แล้วระบบ Event ใน UI_Full.lua จะทำงานเอง
+                GF_Status("🎪 เปิดระบบ Auto Event...")
+                _G.AutoEvent = true
+                _G.AutoEventMacro = true
+                -- สลับ macro ของ Event ให้ตรงกับที่ตั้งไว้ใน Good Farm
+                if current.MacroFile ~= "None" and current.MacroFile ~= "" then
+                    _G.EventSelectedFile = current.MacroFile
+                end
+                _G.SaveConfig()
+
+            elseif mode == "InfiniteNew" then
+                -- Infinite New (Gauntlet): Copy teleport จาก Casino + remote จากผู้ใช้
+                local gauntletTPs = workspace:FindFirstChild("Gauntletteleporters")
+                if gauntletTPs then
+                    local targetElevator = gauntletTPs:FindFirstChild("Elevator4")
+                    if targetElevator then
                         local char = Player.Character
                         local rootPart = char and char:FindFirstChild("HumanoidRootPart")
                         local humanoid = char and char:FindFirstChild("Humanoid")
                         if rootPart then
-                            rootPart.CFrame = entrance.CFrame
-                            task.wait(0.1)
-                            if humanoid then
-                                local basePos = entrance.Position
-                                local offsets = {Vector3.new(2,0,0),Vector3.new(-2,0,0),Vector3.new(0,0,2),Vector3.new(0,0,-2),Vector3.new(0,0,0)}
-                                for _, offset in ipairs(offsets) do humanoid:MoveTo(basePos + offset); task.wait(0.3) end
+                            local entrance = targetElevator:FindFirstChild("Teleports") and targetElevator.Teleports:FindFirstChild("Entrance")
+                            if entrance then
+                                rootPart.CFrame = entrance.CFrame
+                                task.wait(0.3)
+                                if humanoid then
+                                    local basePos = entrance.Position
+                                    local offsets = {
+                                        Vector3.new(2,0,0), Vector3.new(-2,0,0),
+                                        Vector3.new(0,0,2), Vector3.new(0,0,-2),
+                                        Vector3.new(0,0,0)
+                                    }
+                                    for _, offset in ipairs(offsets) do humanoid:MoveTo(basePos + offset); task.wait(0.3) end
+                                end
+                                task.wait(0.3)
                             end
                         end
-                        task.wait(1)
                         local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-                        pcall(function()
-                            if remotes and remotes:FindFirstChild("CullingGamesTeleporters") then
-                                local cg = remotes.CullingGamesTeleporters
-                                if cg:FindFirstChild("TryToStart") then cg.TryToStart:FireServer(elev) end
+                        if remotes and remotes:FindFirstChild("GauntletTeleporters") then
+                            local gauntlet = remotes.GauntletTeleporters
+                            if gauntlet:FindFirstChild("ChooseStage") then
+                                gauntlet.ChooseStage:FireServer(targetElevator, false)
                                 task.wait(0.5)
-                                if cg:FindFirstChild("Start") then cg.Start:FireServer(elev) end
                             end
-                        end)
-                        task.wait(2)
-                        local gGui = Player.PlayerGui:FindFirstChild("GameGui")
-                        if gGui and gGui:FindFirstChild("Info") then
-                            break -- เข้าได้แล้ว
+                            if gauntlet:FindFirstChild("Start") then
+                                gauntlet.Start:FireServer(targetElevator)
+                            end
                         end
                     end
                 end
@@ -870,6 +881,13 @@ task.spawn(function()
             -- นับรอบ
             _G.GoodFarmRoundsDone = (_G.GoodFarmRoundsDone or 0) + 1
             GF_Status("✅ " .. mode .. " จบรอบ " .. _G.GoodFarmRoundsDone .. "/" .. current.Rounds)
+
+            -- ปิด Event flags ถ้าเพิ่งเล่น Event mode (ไม่ให้ค้างไปโหมดอื่น)
+            if mode == "Event" then
+                _G.AutoEvent = false
+                _G.AutoEventMacro = false
+            end
+
             _G.SaveConfig()
             task.wait(3) -- รอ lobby โหลด
         end)
