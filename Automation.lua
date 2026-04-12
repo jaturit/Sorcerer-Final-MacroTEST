@@ -712,6 +712,7 @@ task.spawn(function()
             _G.AutoJoinCasino = false
             _G.AutoEvent = false
             _G.AutoEventMacro = false
+            _G.AutoEventEquip = false
             _G.AutoPlay = false
             task.wait(0.3)
 
@@ -834,6 +835,7 @@ task.spawn(function()
                 GF_Status("🎪 เปิดระบบ Auto Event...")
                 _G.AutoEvent = true
                 _G.AutoEventMacro = true
+                _G.AutoEventEquip = true
                 -- สลับ macro ของ Event ให้ตรงกับที่ตั้งไว้ใน Good Farm
                 if current.MacroFile ~= "None" and current.MacroFile ~= "" then
                     _G.EventSelectedFile = current.MacroFile
@@ -958,6 +960,7 @@ task.spawn(function()
                         _G.AutoJoinCasino = false
                         _G.AutoEvent = false
                         _G.AutoEventMacro = false
+                        _G.AutoEventEquip = false
                         _G.AutoPlay = false
                         _G.GoodFarmRoundsDone = 0
                         _G.SaveConfig()
