@@ -411,6 +411,7 @@ local function RunCasinoMacroLogic()
                 -- รอเงินพอก่อน
                 local neededMoney = (act.Price or 0) + 50
                 local _waitUpTick = 0
+                local _upgradeSkipped = false
                 while _G.AutoCasinoPlay do
                     local money = 0
                     pcall(function() money = Player.leaderstats.Money.Value end)
@@ -418,10 +419,20 @@ local function RunCasinoMacroLogic()
                     if _waitUpTick % 10 == 0 then
                         print("⏳ รอเงินอัปเกรด idx:" .. act.Index .. " | มีเงิน: " .. money .. " | ต้องมี: " .. neededMoney)
                     end
+                    -- ถ้ารอเงินนานเกิน 120 วิ (อาจเป็นราคาอัดผิดคิด) ให้ข้ามไปเลย ไม่บล็อคคิว Defense
+                    if _waitUpTick >= 240 then
+                        print("⚠️ อัปเกรด idx:" .. act.Index .. " รอเงินนานเกินไป (120วิ) ข้ามคิวนี้ไปก่อน")
+                        _upgradeSkipped = true
+                        break
+                    end
                     _waitUpTick = _waitUpTick + 1
                     task.wait(0.5)
                 end
                 if not _G.AutoCasinoPlay then break end
+                if _upgradeSkipped then
+                    -- ข้ามไปเลย ให้คิว Defense ทำงานต่อ
+                    task.wait(0.2)
+                else
                 -- retry upgrade ไม่จำกัด จนกว่าจะสำเร็จ (NO SKIP)
                 local upgradeSuccess = false
                 while _G.AutoCasinoPlay and not upgradeSuccess do
@@ -482,6 +493,7 @@ local function RunCasinoMacroLogic()
                             end
                         end
                     end
+                end
                 end
             else
                 print("⚠️ Upgrade: ไม่มี tower idx:"..tostring(act.Index).." (ข้ามไป)")

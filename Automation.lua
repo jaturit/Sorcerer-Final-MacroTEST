@@ -641,18 +641,27 @@ task.spawn(function()
             local idx = _G.GoodFarmCurrentMode or 1
             local queue = _G.GoodFarmQueue
             if not queue or #queue == 0 then return end
+
+            -- หา mode ที่มี Rounds > 0 (active)
+            local function GF_FindAnyActiveMode(startIdx)
+                for i = 1, #queue do
+                    local ni = ((startIdx - 1 + i - 1) % #queue) + 1
+                    if queue[ni] and queue[ni].Rounds > 0 then return ni end
+                end
+                return nil
+            end
+
             local current = queue[idx]
 
-            -- ถ้าโหมดปัจจุบันครบรอบ หรือ Rounds = 0 → หาอันถัดไป
+            -- ถ้า mode ปัจจุบัน Rounds = 0 หรือครบรอบแล้ว → หา mode ถัดไป
             if not current or current.Rounds <= 0 or (_G.GoodFarmRoundsDone >= current.Rounds) then
                 _G.GoodFarmRoundsDone = 0
-                local nextIdx = GF_FindNextMode(idx + 1)
+                local nextIdx = GF_FindAnyActiveMode(idx + 1)
                 if not nextIdx then
-                    -- วนกลับรอบใหม่จากต้น
-                    nextIdx = GF_FindNextMode(1)
+                    nextIdx = GF_FindAnyActiveMode(1)
                 end
                 if not nextIdx then
-                    GF_Status("⚠️ ไม่มี Mode ที่ตั้งรอบไว้")
+                    GF_Status("⚠️ ไม่มี Mode ที่เปิดใช้งานในคิว")
                     return
                 end
                 _G.GoodFarmCurrentMode = nextIdx
@@ -697,6 +706,16 @@ task.spawn(function()
             end
 
             -- [3] เปิด AutoPlay ตามโหมด
+            -- [3] ปิด flag ของ mode ก่อนหน้าทุกรอบก่อนเปิด mode ใหม่ (ไม่ให้ mode เก่าซ้อนทับกัน)
+            _G.AutoCasinoEnabled = false
+            _G.AutoCasinoPlay = false
+            _G.AutoJoinCasino = false
+            _G.AutoEvent = false
+            _G.AutoEventMacro = false
+            _G.AutoPlay = false
+            task.wait(0.3)
+
+            -- [4] เปิด AutoPlay ตามโหมด
             if mode == "Casino" then
                 GF_Status("🃏 เปิดระบบ Auto Casino...")
                 _G.AutoCasinoEnabled = true
@@ -709,7 +728,7 @@ task.spawn(function()
             _G.AutoToLobby = true
             _G.AutoReplay = false -- ปิด Replay เพื่อให้ AutoToLobby จัดการแทน
 
-            -- [4] Join ด่านตาม Mode
+            -- [5] Join ด่านตาม Mode
             GF_Status("🚀 เข้าด่าน " .. mode .. " รอบ " .. (_G.GoodFarmRoundsDone + 1) .. "/" .. current.Rounds)
 
             if mode == "Casino" then
@@ -862,10 +881,10 @@ task.spawn(function()
                 end
 
             elseif mode == "StoryHell15" then
-                -- Story Hell 15: ใช้ Teleport เข้าด่าน
+                -- Story Hell 15: ใช้ Teleporter6 / Chapter 3 / 15 Hell ยิง ChooseStage สองครั้ง + Start สองครั้ง
                 local teleporters = workspace:FindFirstChild("Teleporters")
                 if teleporters then
-                    local tp = teleporters:FindFirstChild("Teleporter1")
+                    local tp = teleporters:FindFirstChild("Teleporter6")
                     if tp then
                         local char = Player.Character
                         local rootPart = char and char:FindFirstChild("HumanoidRootPart")
@@ -874,7 +893,7 @@ task.spawn(function()
                             local entrance = tp:FindFirstChild("Teleports") and tp.Teleports:FindFirstChild("Entrance")
                             if entrance then
                                 rootPart.CFrame = entrance.CFrame
-                                task.wait(0.3)
+                                task.wait(0.5)
                                 if humanoid then
                                     local basePos = entrance.Position
                                     local offsets = {Vector3.new(2,0,0),Vector3.new(-2,0,0),Vector3.new(0,0,2),Vector3.new(0,0,-2),Vector3.new(0,0,0)}
@@ -882,16 +901,26 @@ task.spawn(function()
                                 end
                             end
                         end
-                        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+                        task.wait(0.5)
+                        local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
                         if remotes and remotes:FindFirstChild("Teleporters") then
                             local tpR = remotes.Teleporters
-                            -- Stage 15, Difficulty Hell
-                            if tpR:FindFirstChild("ChooseStage") then
-                                tpR.ChooseStage:FireServer(tp, {Stage = 15, Difficulty = "Hell"}, _G.StoryFriendsOnly)
+                            local chooseStage = tpR:FindFirstChild("ChooseStage")
+                            local startRemote = tpR:FindFirstChild("Start")
+                            if chooseStage then
+                                -- ยิง ChooseStage ครั้งที่ 1
+                                pcall(function() chooseStage:FireServer(tp, 15, "Hellmode", false) end)
+                                task.wait(0.5)
+                                -- ยิง ChooseStage ครั้งที่ 2
+                                pcall(function() chooseStage:FireServer(tp, 15, "Hellmode", false) end)
                                 task.wait(0.5)
                             end
-                            if tpR:FindFirstChild("Start") then
-                                tpR.Start:FireServer(tp)
+                            if startRemote then
+                                -- กด Start ครั้งที่ 1
+                                pcall(function() startRemote:FireServer(tp) end)
+                                task.wait(1)
+                                -- กด Start ครั้งที่ 2
+                                pcall(function() startRemote:FireServer(tp) end)
                             end
                         end
                     end
@@ -908,18 +937,42 @@ task.spawn(function()
             if not _G.AutoGoodFarm then return end
 
             if not GF_IsInLobby() then
-                -- สคริปต์จับได้ว่าตัวละครหลุดจาก Lobby (วาปสำเร็จ)
-                -- นับรอบเลย! เพราะเดี๋ยวสคริปต์จะถูก Roblox Kill ทิ้งตอนวาร์ปเปลี่ยนด่าน
+                -- วาร์ปสำเร็จ → นับรอบ +1
                 _G.GoodFarmRoundsDone = (_G.GoodFarmRoundsDone or 0) + 1
-                GF_Status("✅ " .. mode .. " วาปสำเร็จ! นับรอบเป็น " .. _G.GoodFarmRoundsDone .. "/" .. current.Rounds)
-                -- (No longer disabling flags here because they are needed inside the actual match)
-                -- _G.SaveConfig() will continue below to save the RoundsDone count
-                
+                GF_Status("✅ " .. mode .. " วาปสำเร็จ! นับรอบ: " .. _G.GoodFarmRoundsDone .. "/" .. current.Rounds)
                 _G.SaveConfig()
-                
-                -- รอให้สคริปต์โดน Kill ทิ้ง
+
+                -- รอให้สคริปต์โดน Kill ทิ้ง (hoist: เดี๋ยวสคริปต์สื๊ออัตโนมัติตอนสลับ Roblox Server)
                 while _G.AutoGoodFarm and not GF_IsInLobby() do
                     task.wait(2)
+                end
+
+                -- กลับมา Lobby แล้ว
+                if _G.AutoGoodFarm then
+                    -- ตรวจว่าครบรอบแล้วไหม
+                    if _G.GoodFarmRoundsDone >= current.Rounds then
+                        -- ครบรอบ! ปิด flag ที่เกี่ยวกับ mode นี้ และเลื่อนไป mode ถัดไป
+                        GF_Status("🏆 " .. mode .. " ครบ " .. current.Rounds .. " รอบแล้ว! ปิด auto และสลับ mode...")
+                        _G.AutoCasinoEnabled = false
+                        _G.AutoCasinoPlay = false
+                        _G.AutoJoinCasino = false
+                        _G.AutoEvent = false
+                        _G.AutoEventMacro = false
+                        _G.AutoPlay = false
+                        _G.GoodFarmRoundsDone = 0
+                        _G.SaveConfig()
+
+                        local nextIdx = GF_FindAnyActiveMode(idx + 1)
+                        if not nextIdx then nextIdx = GF_FindAnyActiveMode(1) end
+                        if nextIdx then
+                            _G.GoodFarmCurrentMode = nextIdx
+                            _G.SaveConfig()
+                            GF_Status("🔄 สลับไป mode: " .. queue[nextIdx].Mode)
+                        else
+                            GF_Status("⚠️ ไม่มี mode ถัดไปในคิว")
+                        end
+                    end
+                    -- ยังไม่ครบรอบ → เดินหน้าลูปเปิดใหม่โดยไม่ต้องทำอะไร
                 end
             else
                 GF_Status("❌ เข้าด่านไม่สำเร็จ (วาปไม่ติด) รอเริ่มใหม่...")
