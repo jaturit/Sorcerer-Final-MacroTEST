@@ -3565,6 +3565,7 @@ local function LoadMainUI()
         end
     end)
 
+    local setCasinoPlayToggle
     local function startCasinoLoop()
         if CasinoSelectedFile == "None" then
             casinoPlayStatus.Text = "❌ เลือกไฟล์ก่อน"

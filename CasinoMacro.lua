@@ -14,16 +14,16 @@ local SaveConfig = _G.SaveConfig
 
 -- Door Sequence Tracker
 local CasinoDoorSequence = {} -- { [sequence_order] = door_number }
-local CasinoDoorTrackerRunning = false
+local CasinoDoorTrackerThreadID = 0
 
 local function StartCasinoDoorTracker()
-    if CasinoDoorTrackerRunning then return end
-    CasinoDoorTrackerRunning = true
+    CasinoDoorTrackerThreadID = CasinoDoorTrackerThreadID + 1
+    local currentThread = CasinoDoorTrackerThreadID
     CasinoDoorSequence = {}
     task.spawn(function()
         local doorStates = {}
         for i = 1, 8 do doorStates[i] = false end
-        while CasinoDoorTrackerRunning do
+        while CasinoDoorTrackerThreadID == currentThread do
             pcall(function()
                 local paths = workspace.Map.Hakari.Paths
                 for i = 1, 8 do
@@ -44,7 +44,7 @@ local function StartCasinoDoorTracker()
 end
 
 local function StopCasinoDoorTracker()
-    CasinoDoorTrackerRunning = false
+    CasinoDoorTrackerThreadID = CasinoDoorTrackerThreadID + 1
 end
 
 local function GetDoorBySequence(seq)
@@ -360,7 +360,7 @@ local function RunCasinoMacroLogic()
                             pcall(function()
                                 countAfter = #workspace.Towers:GetChildren()
                             end)
-                        until countAfter > countBefore or waited2 >= 2
+                        until countAfter > countBefore or waited2 >= 5
 
                         if countAfter > countBefore then
                             GameTowers[idx] = result
@@ -438,7 +438,7 @@ local function RunCasinoMacroLogic()
                         elseif result then
                             local waited = 0
                             repeat task.wait(0.05) waited = waited + 0.05
-                            until Player.leaderstats.Money.Value ~= moneyBefore or waited >= 2
+                            until Player.leaderstats.Money.Value ~= moneyBefore or waited >= 5
                             if Player.leaderstats.Money.Value < moneyBefore then
                                 GameTowers[act.Index] = result
                                 upgradeSuccess = true
