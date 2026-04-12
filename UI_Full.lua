@@ -2575,7 +2575,7 @@ local function LoadMainUI()
                     pcall(function() unequipRemote:FireServer(deckUUID) end)
                     unequipCount = unequipCount + 1
                     print("🔧 Unequip: " .. deckUUID:sub(1,12) .. "...")
-                    task.wait(0.3)
+                    task.wait(0.6)
                 end
             end
             
@@ -2585,7 +2585,7 @@ local function LoadMainUI()
                 pcall(function() equipRemote:FireServer(uuid) end)
                 equipCount = equipCount + 1
                 print("✅ Equip: " .. uuid:sub(1,12) .. "...")
-                task.wait(0.3)
+                task.wait(0.6)
             end
             
             towerCheckLbl.Text = "✅ Equip เสร็จ! (" .. equipCount .. " ตัว, ถอด " .. unequipCount .. " ตัว)"
@@ -3299,10 +3299,10 @@ local function LoadMainUI()
                                         pcall(function() unequipRemote:FireServer(deckUUID) end)
                                         unequipCount = unequipCount + 1
                                         print("🔧 [Event] Unequip: " .. deckUUID)
-                                        task.wait(0.3)
+                                        task.wait(0.6)
                                     end
 
-                                    if unequipCount > 0 then task.wait(1) end
+                                     if unequipCount > 0 then task.wait(1.5) end
 
                                     -- Step 2: Equip ตัวที่ต้องการ
                                     local equipCount = 0
@@ -3310,7 +3310,7 @@ local function LoadMainUI()
                                         pcall(function() equipRemote:FireServer(uuid) end)
                                         equipCount = equipCount + 1
                                         print("✅ [Event] Equip: " .. uuid)
-                                        task.wait(0.3)
+                                        task.wait(0.6)
                                     end
 
                                     eventStatus.Text = "🔧 Equip เสร็จ! (" .. equipCount .. " ตัว, ถอด " .. unequipCount .. " ตัว)"

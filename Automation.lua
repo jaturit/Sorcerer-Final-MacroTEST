@@ -508,28 +508,101 @@ end)
 local function GoodFarmEquipFromMacro(macroPath)
     local ok = false
     pcall(function()
-        if not isfile(macroPath) then return end
+        if not isfile(macroPath) then
+            print("🌾 [GoodFarm] ไม่เจอไฟล์: " .. macroPath)
+            return
+        end
         local HttpService = game:GetService("HttpService")
         local RS = game:GetService("ReplicatedStorage")
         local equipRemote = RS.Remotes.Towers.EquipTower
         local unequipRemote = RS.Remotes.Towers.UnequipTower
 
-        -- อ่าน UUID จาก macro
-        local uniqueUUIDs = {}
+        -- อ่าน UUID/TowerID จาก macro (รองรับทั้ง 2 format)
+        local uniqueUUIDs = {}   -- UUID สำหรับ equip (จาก macro ปกติ)
+        local towerIDNames = {}  -- ชื่อ Tower (จาก casino macro)
         local seenUUID = {}
+        local isCasinoFormat = false
+
         local macroData = HttpService:JSONDecode(readfile(macroPath))
         local actions = macroData
         if type(macroData) == "table" and macroData.Actions then actions = macroData.Actions end
         if type(actions) == "table" then
             for _, act in ipairs(actions) do
                 if act.Type == "Spawn" then
+                    -- Macro ปกติ: มี TowerName = UUID (มี "-" ข้างใน)
+                    -- Casino macro: มี TowerID = ชื่อ tower type
                     local uuid = act.TowerName or (act.Args and act.Args[1])
-                    if uuid and not seenUUID[uuid] then
+                    local towerID = act.TowerID
+
+                    if uuid and uuid:find("-") and not seenUUID[uuid] then
+                        -- UUID format (macro ปกติ)
                         seenUUID[uuid] = true
                         table.insert(uniqueUUIDs, uuid)
+                    elseif towerID and not seenUUID[towerID] then
+                        -- Casino format: ต้องไป match กับ Inventory
+                        seenUUID[towerID] = true
+                        table.insert(towerIDNames, towerID)
+                        isCasinoFormat = true
+                    elseif uuid and not uuid:find("-") and not seenUUID[uuid] then
+                        -- TowerName แต่ไม่ใช่ UUID (อาจเป็น format พิเศษ)
+                        seenUUID[uuid] = true
+                        table.insert(towerIDNames, uuid)
+                        isCasinoFormat = true
                     end
                 end
             end
+        end
+
+        print("🌾 [GoodFarm] UUID จาก macro: " .. #uniqueUUIDs .. " | TowerID จาก casino: " .. #towerIDNames)
+
+        -- ถ้าเป็น Casino format → ค้นหา UUID จาก Inventory ที่ match ชื่อ TowerID
+        if isCasinoFormat and #towerIDNames > 0 then
+            pcall(function()
+                local invGui = Player.PlayerGui:FindFirstChild("Inventory")
+                if invGui then
+                    local towersFrame = invGui:FindFirstChild("Towers")
+                    if towersFrame then
+                        for _, towerName in ipairs(towerIDNames) do
+                            local found = false
+                            for _, slot in pairs(towersFrame:GetChildren()) do
+                                if slot:IsA("Frame") or slot:IsA("ImageButton") or slot:IsA("TextButton") then
+                                    -- เช็คชื่อ tower ในแต่ละ slot
+                                    local nameLabel = slot:FindFirstChild("TowerName") or slot:FindFirstChild("Name")
+                                    local slotName = slot.Name
+                                    -- ถ้าชื่อ slot เป็น UUID และมี label ที่ match กับ towerName
+                                    if slotName:find("-") and #slotName > 20 then
+                                        -- ลองจับจาก attribute หรือ child ที่มีชื่อ tower
+                                        local matchFound = false
+                                        pcall(function()
+                                            for _, child in pairs(slot:GetDescendants()) do
+                                                if child:IsA("TextLabel") and child.Text and child.Text:lower():find(towerName:lower()) then
+                                                    matchFound = true
+                                                end
+                                            end
+                                        end)
+                                        if matchFound and not seenUUID["uuid_" .. slotName] then
+                                            seenUUID["uuid_" .. slotName] = true
+                                            table.insert(uniqueUUIDs, slotName)
+                                            print("🌾 [GoodFarm] Casino match: " .. towerName .. " → " .. slotName:sub(1, 12) .. "...")
+                                            found = true
+                                            break
+                                        end
+                                    end
+                                end
+                            end
+                            if not found then
+                                print("⚠️ [GoodFarm] ไม่เจอ tower '" .. towerName .. "' ใน Inventory")
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+
+        if #uniqueUUIDs == 0 then
+            print("⚠️ [GoodFarm] ไม่มี tower ที่ต้อง equip (ข้ามขั้นตอน equip)")
+            ok = true
+            return
         end
 
         -- อ่าน deck ปัจจุบัน → Unequip ทุกตัว
@@ -548,19 +621,19 @@ local function GoodFarmEquipFromMacro(macroPath)
             end
         end)
 
-        print("🌾 [GoodFarm] Deck ปัจจุบัน: " .. #currentDeck .. " | ต้องการ: " .. #uniqueUUIDs)
+        print("🌾 [GoodFarm] Deck ปัจจุบัน: " .. #currentDeck .. " | ต้องการ Equip: " .. #uniqueUUIDs)
 
         for _, deckUUID in ipairs(currentDeck) do
             pcall(function() unequipRemote:FireServer(deckUUID) end)
-            task.wait(0.3)
+            task.wait(0.6)
         end
-        if #currentDeck > 0 then task.wait(0.5) end
+        if #currentDeck > 0 then task.wait(1.5) end
 
         for _, uuid in ipairs(uniqueUUIDs) do
             pcall(function() equipRemote:FireServer(uuid) end)
-            task.wait(0.3)
+            task.wait(0.6)
         end
-        print("🌾 [GoodFarm] Equip เสร็จ!")
+        print("🌾 [GoodFarm] Equip เสร็จ! (" .. #uniqueUUIDs .. " ตัว)")
         ok = true
     end)
     return ok
