@@ -778,13 +778,33 @@ task.spawn(function()
                 _G.AutoCasinoPlay = true
                 _G.SaveConfig()
             elseif mode ~= "Event" then
-                _G._IsEventAutoPlay = false
-                if _G.SetDashboardAutoPlay then _G.SetDashboardAutoPlay(true) end
-                _G.AutoPlay = true
-                if _G.RunMacroLogic then _G.RunMacroLogic() end
-                -- สลับ Macro File ให้ตรงกับที่ตั้งไว้ (ถ้าไม่ใช่เลือก None)
+                -- [4.1] ตั้งค่าไฟล์ Macro ก่อนเริ่มรัน
                 if current.MacroFile ~= "None" and current.MacroFile ~= "" then
                     _G.SelectedFile = current.MacroFile
+                    print("⚙️ [GoodFarm] เลือกไฟล์ Macro: " .. current.MacroFile)
+                end
+                
+                -- [4.2] เปิดระบบ AutoPlay และ Sync UI (เพิ่มระบบรอ UI พร้อม)
+                _G._IsEventAutoPlay = false
+                _G.AutoPlay = true
+                print("▶️ [GoodFarm] เปิดระบบ Auto Play Macro...")
+
+                task.spawn(function()
+                    local t = 0
+                    while not _G.SetDashboardAutoPlay and t < 20 do
+                        task.wait(0.5)
+                        t = t + 1
+                    end
+                    if _G.SetDashboardAutoPlay then 
+                        _G.SetDashboardAutoPlay(true) 
+                        print("📺 [GoodFarm] Sync หน้า Dashboard สำเร็จ")
+                    end
+                end)
+                
+                -- [4.3] เริ่มรัน Logic (ต้องทำหลังตั้งค่าไฟล์เสร็จ)
+                if _G.RunMacroLogic then 
+                    _G.RunMacroLogic() 
+                    print("🚀 [GoodFarm] เริ่มรัน Macro Logic สำเร็จ")
                 end
             end
             
