@@ -2712,19 +2712,19 @@ local function LoadMainUI()
     eventStatus.TextWrapped = true
     eventStatus.ZIndex = 5
 
-    createToggle(EventCtrlBox, "🎪 Auto Event", _G.AutoEvent, function(v)
+    _G.SetEventToggle = createToggle(EventCtrlBox, "🎪 Auto Event", _G.AutoEvent, function(v)
         _G.AutoEvent = v
         SaveConfig()
     end)
 
     _G.AutoEventMacro = _G.AutoEventMacro or false
-    createToggle(EventCtrlBox, "▶️ Auto Play Event Macro", _G.AutoEventMacro, function(v)
+    _G.SetEventMacroToggle = createToggle(EventCtrlBox, "▶️ Auto Play Event Macro", _G.AutoEventMacro, function(v)
         _G.AutoEventMacro = v
         SaveConfig()
     end)
 
     _G.AutoEventEquip = _G.AutoEventEquip or false
-    createToggle(EventCtrlBox, "🔧 Auto Equip Event", _G.AutoEventEquip, function(v)
+    _G.SetEventEquipToggle = createToggle(EventCtrlBox, "🔧 Auto Equip Event", _G.AutoEventEquip, function(v)
         _G.AutoEventEquip = v
         SaveConfig()
     end)

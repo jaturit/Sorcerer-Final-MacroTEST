@@ -651,10 +651,15 @@ local function LoadGoodFarmState()
                 _G.GoodFarmCurrentMode = data.CurrentIdx or 1
                 _G.GoodFarmRoundsDone = data.RoundsDone or 0
 
-                -- 🛡️ [Pre-emptive Safeguard] ถ้าครบรอบแล้ว ให้สั่งปิด Flag ทันทีป้องกันลูปอื่น Join ทับ
+                -- 🛡️ [Pre-emptive Safeguard] เฉพาะตอนอยู่ Lobby: ถ้าจบรอบแล้ว ให้สั่งปิด Flag ทันทีป้องกันการ Join ซ้ำ
                 local idx = _G.GoodFarmCurrentMode
                 local q = (_G.GoodFarmQueue or {})[idx]
-                if q and q.Rounds > 0 and _G.GoodFarmRoundsDone >= q.Rounds then
+                if q and q.Rounds > 0 and _G.GoodFarmRoundsDone >= q.Rounds and GF_IsInLobby() then
+                    if _G.SetEventToggle then _G.SetEventToggle(false) end
+                    if _G.SetEventMacroToggle then _G.SetEventMacroToggle(false) end
+                    if _G.SetEventEquipToggle then _G.SetEventEquipToggle(false) end
+                    if _G.SetDashboardAutoPlay then _G.SetDashboardAutoPlay(false) end
+
                     _G.AutoEvent = false
                     _G.AutoEventMacro = false
                     _G.AutoEventEquip = false
@@ -765,6 +770,11 @@ task.spawn(function()
             _G.AutoCasinoEnabled = false
             _G.AutoCasinoPlay = false
             _G.AutoJoinCasino = false
+            
+            if _G.SetEventToggle then _G.SetEventToggle(false) end
+            if _G.SetEventMacroToggle then _G.SetEventMacroToggle(false) end
+            if _G.SetEventEquipToggle then _G.SetEventEquipToggle(false) end
+            
             _G.AutoEvent = false
             _G.AutoEventMacro = false
             _G.AutoEventEquip = false
@@ -917,9 +927,18 @@ task.spawn(function()
                 -- ใช้ระบบ AutoEvent เดิมจัดการทั้งหมด (หาตู้ เลือกการ์ด equip เล่น macro)
                 -- แค่เปิด flag แล้วระบบ Event ใน UI_Full.lua จะทำงานเอง
                 GF_Status("🎪 เปิดระบบ Auto Event...")
+                
                 _G.AutoEvent = true
                 _G.AutoEventMacro = true
                 _G.AutoEventEquip = true
+
+                task.spawn(function()
+                    local t = 0
+                    while not _G.SetEventToggle and t < 20 do task.wait(0.5); t = t + 1 end
+                    if _G.SetEventToggle then _G.SetEventToggle(true) end
+                    if _G.SetEventMacroToggle then _G.SetEventMacroToggle(true) end
+                    if _G.SetEventEquipToggle then _G.SetEventEquipToggle(true) end
+                end)
                 -- สลับ macro ของ Event ให้ตรงกับที่ตั้งไว้ใน Good Farm
                 if current.MacroFile ~= "None" and current.MacroFile ~= "" then
                     _G.EventSelectedFile = current.MacroFile
