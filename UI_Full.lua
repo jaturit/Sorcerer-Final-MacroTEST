@@ -811,11 +811,8 @@ local function LoadMainUI()
         -- Mode Labels
         local ModeNames = {
             { key = "Event",       label = "🎪 Event Mode" },
-            { key = "RaidMeguna",  label = "⚔️ Raid Meguna" },
-            { key = "RaidGojo",    label = "⚡ Raid Gojo" },
             { key = "InfiniteNew", label = "🌀 Infinite New" },
             { key = "Casino",      label = "🎰 Casino" },
-            { key = "StoryHell15", label = "📖 Story Hell 15" },
         }
 
         -- Helper: find queue entry by mode key

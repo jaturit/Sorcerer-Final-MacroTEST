@@ -822,9 +822,7 @@ task.spawn(function()
             _G.AutoReplay = false -- ปิด Replay เพื่อให้ AutoToLobby จัดการแทน
 
             -- [5] Join ด่านตาม Mode
-            _G.GoodFarmRoundsDone = (_G.GoodFarmRoundsDone or 0) + 1
-            SaveGoodFarmState()
-            GF_Status("🚀 [" .. mode .. "] กำลังเข้าด่าน รอบ " .. _G.GoodFarmRoundsDone .. "/" .. current.Rounds)
+            GF_Status("🚀 [" .. mode .. "] กำลังเข้าด่าน...")
 
             if mode == "Casino" then
                 -- Copy จาก AutoJoinCasino
@@ -857,68 +855,6 @@ task.spawn(function()
                             local hakari = remotes.HakariTeleporters
                             if hakari:FindFirstChild("ChooseStage") then hakari.ChooseStage:FireServer(targetElevator, _G.StoryFriendsOnly); task.wait(0.5) end
                             if hakari:FindFirstChild("Start") then hakari.Start:FireServer(targetElevator) end
-                        end
-                    end
-                end
-
-            elseif mode == "RaidMeguna" then
-                -- Copy จาก AutoJoinRaid (Elevator6)
-                local raidTPs = workspace:FindFirstChild("RaidTeleporters")
-                if raidTPs then
-                    local targetElevator = raidTPs:FindFirstChild("Elevator6")
-                    if targetElevator then
-                        local char = Player.Character
-                        local rootPart = char and char:FindFirstChild("HumanoidRootPart")
-                        local humanoid = char and char:FindFirstChild("Humanoid")
-                        if rootPart then
-                            local entrance = targetElevator:FindFirstChild("Teleports") and targetElevator.Teleports:FindFirstChild("Entrance")
-                            if entrance then
-                                rootPart.CFrame = entrance.CFrame
-                                task.wait(0.3)
-                                if humanoid then
-                                    local basePos = entrance.Position
-                                    local offsets = {Vector3.new(2,0,0),Vector3.new(-2,0,0),Vector3.new(0,0,2),Vector3.new(0,0,-2),Vector3.new(0,0,0)}
-                                    for _, offset in ipairs(offsets) do humanoid:MoveTo(basePos + offset); task.wait(0.3) end
-                                end
-                                task.wait(0.3)
-                            end
-                        end
-                        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-                        if remotes and remotes:FindFirstChild("RaidTeleporters") then
-                            local raid = remotes.RaidTeleporters
-                            if raid:FindFirstChild("ChooseStage") then raid.ChooseStage:FireServer(targetElevator, _G.StoryFriendsOnly); task.wait(0.5) end
-                            if raid:FindFirstChild("Start") then raid.Start:FireServer(targetElevator) end
-                        end
-                    end
-                end
-
-            elseif mode == "RaidGojo" then
-                -- Copy จาก AutoJoinRaidGojo (Elevator5)
-                local raidTPs = workspace:FindFirstChild("RaidTeleporters")
-                if raidTPs then
-                    local targetElevator = raidTPs:FindFirstChild("Elevator5")
-                    if targetElevator then
-                        local char = Player.Character
-                        local rootPart = char and char:FindFirstChild("HumanoidRootPart")
-                        local humanoid = char and char:FindFirstChild("Humanoid")
-                        if rootPart then
-                            local entrance = targetElevator:FindFirstChild("Teleports") and targetElevator.Teleports:FindFirstChild("Entrance")
-                            if entrance then
-                                rootPart.CFrame = entrance.CFrame
-                                task.wait(0.3)
-                                if humanoid then
-                                    local basePos = entrance.Position
-                                    local offsets = {Vector3.new(2,0,0),Vector3.new(-2,0,0),Vector3.new(0,0,2),Vector3.new(0,0,-2),Vector3.new(0,0,0)}
-                                    for _, offset in ipairs(offsets) do humanoid:MoveTo(basePos + offset); task.wait(0.3) end
-                                end
-                                task.wait(0.3)
-                            end
-                        end
-                        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-                        if remotes and remotes:FindFirstChild("RaidTeleporters") then
-                            local raid = remotes.RaidTeleporters
-                            if raid:FindFirstChild("ChooseStage") then raid.ChooseStage:FireServer(targetElevator, _G.StoryFriendsOnly); task.wait(0.5) end
-                            if raid:FindFirstChild("Start") then raid.Start:FireServer(targetElevator) end
                         end
                     end
                 end
@@ -985,54 +921,9 @@ task.spawn(function()
                     end
                 end
 
-            elseif mode == "StoryHell15" then
-                -- Story Hell 15: ใช้ Teleporter6 / Chapter 3 / 15 Hell ยิง ChooseStage สองครั้ง + Start สองครั้ง
-                local teleporters = workspace:FindFirstChild("Teleporters")
-                if teleporters then
-                    local tp = teleporters:FindFirstChild("Teleporter6")
-                    if tp then
-                        local char = Player.Character
-                        local rootPart = char and char:FindFirstChild("HumanoidRootPart")
-                        local humanoid = char and char:FindFirstChild("Humanoid")
-                        if rootPart then
-                            local entrance = tp:FindFirstChild("Teleports") and tp.Teleports:FindFirstChild("Entrance")
-                            if entrance then
-                                rootPart.CFrame = entrance.CFrame
-                                task.wait(0.5)
-                                if humanoid then
-                                    local basePos = entrance.Position
-                                    local offsets = {Vector3.new(2,0,0),Vector3.new(-2,0,0),Vector3.new(0,0,2),Vector3.new(0,0,-2),Vector3.new(0,0,0)}
-                                    for _, offset in ipairs(offsets) do humanoid:MoveTo(basePos + offset); task.wait(0.3) end
-                                end
-                            end
-                        end
-                        task.wait(0.5)
-                        local remotes = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes")
-                        if remotes and remotes:FindFirstChild("Teleporters") then
-                            local tpR = remotes.Teleporters
-                            local chooseStage = tpR:FindFirstChild("ChooseStage")
-                            local startRemote = tpR:FindFirstChild("Start")
-                            if chooseStage then
-                                -- ยิง ChooseStage ครั้งที่ 1
-                                pcall(function() chooseStage:FireServer(tp, 15, "Hellmode", false) end)
-                                task.wait(0.5)
-                                -- ยิง ChooseStage ครั้งที่ 2
-                                pcall(function() chooseStage:FireServer(tp, 15, "Hellmode", false) end)
-                                task.wait(0.5)
-                            end
-                            if startRemote then
-                                -- กด Start ครั้งที่ 1
-                                pcall(function() startRemote:FireServer(tp) end)
-                                task.wait(1)
-                                -- กด Start ครั้งที่ 2
-                                pcall(function() startRemote:FireServer(tp) end)
-                            end
-                        end
-                    end
-                end
             end
 
-            -- [5] รอจนกว่าจะเข้าด่านได้ (ออกจาก Lobby)
+            -- [6] รอจนกว่าจะเข้าด่านได้ (ออกจาก Lobby)
             local waitCount = 0
             while GF_IsInLobby() and _G.AutoGoodFarm and waitCount < 60 do
                 task.wait(1)
@@ -1042,31 +933,35 @@ task.spawn(function()
             if not _G.AutoGoodFarm then return end
 
             if not GF_IsInLobby() then
-                -- วาร์ปสำเร็จแล้ว (สคริปต์ในเซิร์ฟเวอร์ใหม่จะเริ่มทำงานเอง)
-                GF_Status("✅ [" .. mode .. "] วาปสำเร็จ! เข้าด่านแล้ว...")
+                -- เข้าด่านสำเร็จ → นับรอบตอนนี้ (ไม่นับก่อนเข้า)
+                _G.GoodFarmRoundsDone = (_G.GoodFarmRoundsDone or 0) + 1
+                SaveGoodFarmState()
+                GF_Status("✅ [" .. mode .. "] เข้าด่านสำเร็จ! รอบ " .. _G.GoodFarmRoundsDone .. "/" .. current.Rounds)
                 _G.SaveConfig()
 
-                -- รอให้สคริปต์โดน Kill ทิ้ง
+                -- รอจนกลับ lobby (สคริปอาจหลุดแล้ว loadstring ใหม่)
                 while _G.AutoGoodFarm and not GF_IsInLobby() do
                     task.wait(2)
                 end
 
-                -- ถ้ากลับมา Lobby (เช่นกรณีจบเกมแล้ววาปกลับมา)
+                -- กลับมา lobby แล้ว → ปิด flag ทุกระบบก่อน
                 if _G.AutoGoodFarm then
+                    _G.AutoCasinoEnabled = false
+                    _G.AutoCasinoPlay = false
+                    _G.AutoJoinCasino = false
+                    _G.AutoEvent = false
+                    _G.AutoEventMacro = false
+                    _G.AutoEventEquip = false
+                    _G.AutoPlay = false
+                    _G._IsEventAutoPlay = false
+                    _G.SaveConfig()
+                    task.wait(1)
+
                     -- ตรวจว่าครบรอบแล้วไหม
                     if _G.GoodFarmRoundsDone >= current.Rounds then
-                        -- ครบรอบ! ปิด flag และเลื่อนไป mode ถัดไป
-                        GF_Status("🏆 " .. mode .. " ครบ " .. current.Rounds .. " รอบแล้ว! เตรียมสลับ mode...")
-                        _G.AutoCasinoEnabled = false
-                        _G.AutoCasinoPlay = false
-                        _G.AutoJoinCasino = false
-                        _G.AutoEvent = false
-                        _G.AutoEventMacro = false
-                        _G.AutoEventEquip = false
-                        _G.AutoPlay = false
+                        GF_Status("🏆 " .. mode .. " ครบ " .. current.Rounds .. " รอบแล้ว! สลับ mode...")
                         _G.GoodFarmRoundsDone = 0
                         SaveGoodFarmState()
-                        _G.SaveConfig()
 
                         local nextIdx = GF_FindAnyActiveMode(idx + 1)
                         if not nextIdx then nextIdx = GF_FindAnyActiveMode(1) end
@@ -1079,7 +974,7 @@ task.spawn(function()
                     end
                 end
             else
-                GF_Status("❌ เข้าด่านไม่สำเร็จ (วาปไม่ติด) รอเริ่มใหม่...")
+                GF_Status("❌ เข้าด่านไม่สำเร็จ รอเริ่มใหม่...")
             end
 
             task.wait(3) -- รอจัดคิวรอบใหม่
