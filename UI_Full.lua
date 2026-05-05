@@ -38,6 +38,8 @@ local LoadStoryTowers = _G.LoadStoryTowers
 local LoadDashboardCache = _G.LoadDashboardCache
 local HookEnabled = _G._HookEnabled
 local UserAuth = _G._UserAuth
+local ApplyLowPerformanceMode = _G.ApplyLowPerformanceMode
+local SetLowPerformanceFPS = _G.SetLowPerformanceFPS
 
 -- ShowLogin จะถูกประกาศใน LoginUI.lua ที่โหลดทีหลัง
 -- UI_Full เรียก ShowLogin() ผ่าน _G.ShowLogin แทน (deferred reference)
@@ -1172,7 +1174,7 @@ local function LoadMainUI()
     h1ctrl.TextXAlignment = Enum.TextXAlignment.Left
     h1ctrl.ZIndex = 4
 
-    local MainBox = createContainer(Page1, 550)
+    local MainBox = createContainer(Page1, 640)
 
     _G.SetDashboardAutoPlay = createToggle(MainBox, "▶️ Auto Play Macro", _G.AutoPlay, function(v)
         _G._IsEventAutoPlay = false
@@ -1193,6 +1195,33 @@ local function LoadMainUI()
         _G.FastSkip = v
         SaveConfig()
     end)
+
+    _G.LowPerformanceMode = _G.LowPerformanceMode or false
+    _G.LowPerformanceFPS = tonumber(_G.LowPerformanceFPS) or 15
+    _G.SetLagSaverToggle = createToggle(MainBox, "⬜ Lag Saver (White Screen + Low FPS)", _G.LowPerformanceMode, function(v)
+        _G.LowPerformanceMode = v
+        if ApplyLowPerformanceMode then
+            ApplyLowPerformanceMode(v)
+        end
+        SaveConfig()
+    end)
+
+    createInput(MainBox, "Lag Saver FPS", "10 / 15 / 20", tostring(_G.LowPerformanceFPS), function(text)
+        local fps = tonumber(text)
+        if fps then
+            if fps < 5 then fps = 5 end
+            if fps > 60 then fps = 60 end
+            fps = math.floor(fps)
+            _G.LowPerformanceFPS = fps
+            if SetLowPerformanceFPS then
+                SetLowPerformanceFPS(fps)
+            elseif ApplyLowPerformanceMode then
+                ApplyLowPerformanceMode(_G.LowPerformanceMode)
+            end
+            SaveConfig()
+        end
+    end)
+
     createToggle(MainBox, "🚪 Auto To Lobby", _G.AutoToLobby, function(v) _G.AutoToLobby = v; SaveConfig() end)
 
     _G.PrivateServerLink = _G.PrivateServerLink or ""

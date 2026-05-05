@@ -10,6 +10,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
 
 local Request = request or http_request or (syn and syn.request) or (http and http.request) or (fluxus and fluxus.request) or function() return nil end
 
@@ -34,6 +36,8 @@ _G._Services = {
     ReplicatedStorage = ReplicatedStorage,
     UserInputService = UserInputService,
     TweenService = TweenService,
+    RunService = RunService,
+    Lighting = Lighting,
 }
 _G._Request = Request
 _G._Player = Player
@@ -62,6 +66,8 @@ _G.AutoJoinRaidGojo = false
 _G.AutoCasinoPlay = false
 _G.AutoCasinoEnabled = false  -- ผู้ใช้ต้องการ auto (ไม่ reset ตอน macro จบ)
 _G.CasinoSelectedFile = "None"
+_G.LowPerformanceMode = false
+_G.LowPerformanceFPS = 15
 
 -- Auto Story
 _G.AutoStory = false
@@ -154,6 +160,222 @@ local Colors = {
     Orange = Color3.fromRGB(255, 150, 0),
 }
 _G._Colors = Colors
+
+-- Low FPS / low graphics mode for long farm sessions.
+local performanceState = {
+    originals = setmetatable({}, { __mode = "k" }),
+    connection = nil,
+    originalFPSCap = nil,
+    screenCover = nil,
+}
+
+local function ClampNumber(value, minValue, maxValue)
+    value = tonumber(value) or minValue
+    value = math.floor(value)
+    if value < minValue then return minValue end
+    if value > maxValue then return maxValue end
+    return value
+end
+
+local function SaveOriginal(instance, property)
+    local ok, current = pcall(function()
+        return instance[property]
+    end)
+    if not ok then return end
+    local props = performanceState.originals[instance]
+    if not props then
+        props = {}
+        performanceState.originals[instance] = props
+    end
+    if props[property] == nil then
+        props[property] = current
+    end
+end
+
+local function SetOptimizedProperty(instance, property, value)
+    pcall(function()
+        SaveOriginal(instance, property)
+        instance[property] = value
+    end)
+end
+
+local function GetFPSCapper()
+    return setfpscap or set_fps_cap or (syn and syn.setfpscap)
+end
+
+local function SetFPSCap(value)
+    local capper = GetFPSCapper()
+    if type(capper) == "function" then
+        pcall(capper, value)
+        return true
+    end
+    return false
+end
+
+local function ApplyQualityLevel()
+    pcall(function()
+        UserSettings():GetService("UserGameSettings").SavedQualityLevel = Enum.SavedQualitySetting.QualityLevel1
+    end)
+    pcall(function()
+        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
+    end)
+end
+
+local function OptimizeInstance(instance)
+    if instance:IsA("ParticleEmitter") or instance:IsA("Trail") or instance:IsA("Beam")
+        or instance:IsA("Smoke") or instance:IsA("Fire") or instance:IsA("Sparkles") then
+        SetOptimizedProperty(instance, "Enabled", false)
+    elseif instance:IsA("Decal") or instance:IsA("Texture") then
+        SetOptimizedProperty(instance, "Transparency", 1)
+    elseif instance:IsA("PointLight") or instance:IsA("SpotLight") or instance:IsA("SurfaceLight") then
+        SetOptimizedProperty(instance, "Enabled", false)
+    elseif instance:IsA("PostEffect") then
+        SetOptimizedProperty(instance, "Enabled", false)
+    elseif instance:IsA("BasePart") then
+        SetOptimizedProperty(instance, "CastShadow", false)
+        SetOptimizedProperty(instance, "Reflectance", 0)
+    end
+end
+
+local function RestoreOptimizedProperties()
+    for instance, props in pairs(performanceState.originals) do
+        if instance and instance.Parent then
+            for property, value in pairs(props) do
+                pcall(function()
+                    instance[property] = value
+                end)
+            end
+        end
+    end
+    performanceState.originals = setmetatable({}, { __mode = "k" })
+end
+
+local ApplyLowPerformanceMode
+
+local function DestroyScreenCover()
+    if performanceState.screenCover then
+        pcall(function()
+            performanceState.screenCover:Destroy()
+        end)
+        performanceState.screenCover = nil
+    end
+end
+
+local function ShowScreenCover()
+    DestroyScreenCover()
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "LagSaverWhiteScreen"
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.DisplayOrder = 2147483647
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+    local cover = Instance.new("Frame", gui)
+    cover.Name = "WhiteCover"
+    cover.Size = UDim2.new(1, 0, 1, 0)
+    cover.Position = UDim2.new(0, 0, 0, 0)
+    cover.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    cover.BorderSizePixel = 0
+    cover.ZIndex = 10000
+
+    local offButton = Instance.new("TextButton", cover)
+    offButton.Name = "DisableLagSaver"
+    offButton.Size = UDim2.new(0, 170, 0, 38)
+    offButton.Position = UDim2.new(1, -185, 0, 15)
+    offButton.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    offButton.Text = "LAG SAVER: ON"
+    offButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    offButton.Font = Enum.Font.GothamBold
+    offButton.TextSize = 13
+    offButton.ZIndex = 10001
+    Instance.new("UICorner", offButton).CornerRadius = UDim.new(0, 8)
+
+    offButton.MouseButton1Click:Connect(function()
+        ApplyLowPerformanceMode(false)
+        if _G.SetLagSaverToggle then
+            _G.SetLagSaverToggle(false)
+        end
+        if _G.SaveConfig then
+            _G.SaveConfig()
+        end
+    end)
+
+    pcall(function()
+        gui.Parent = game:GetService("CoreGui")
+    end)
+    if not gui.Parent then
+        gui.Parent = PlayerGui
+    end
+
+    performanceState.screenCover = gui
+end
+
+function ApplyLowPerformanceMode(enabled)
+    _G.LowPerformanceMode = enabled and true or false
+    _G.LowPerformanceFPS = ClampNumber(_G.LowPerformanceFPS, 5, 60)
+
+    if _G.LowPerformanceMode then
+        if performanceState.originalFPSCap == nil then
+            pcall(function()
+                if type(getfpscap) == "function" then
+                    performanceState.originalFPSCap = getfpscap()
+                end
+            end)
+        end
+
+        SetFPSCap(_G.LowPerformanceFPS)
+        ApplyQualityLevel()
+
+        SetOptimizedProperty(Lighting, "GlobalShadows", false)
+        SetOptimizedProperty(Lighting, "EnvironmentDiffuseScale", 0)
+        SetOptimizedProperty(Lighting, "EnvironmentSpecularScale", 0)
+        SetOptimizedProperty(Lighting, "FogEnd", 100000)
+
+        local terrain = workspace:FindFirstChildOfClass("Terrain")
+        if terrain then
+            SetOptimizedProperty(terrain, "WaterWaveSize", 0)
+            SetOptimizedProperty(terrain, "WaterWaveSpeed", 0)
+            SetOptimizedProperty(terrain, "WaterReflectance", 0)
+            SetOptimizedProperty(terrain, "WaterTransparency", 1)
+            SetOptimizedProperty(terrain, "Decoration", false)
+        end
+
+        for _, instance in ipairs(game:GetDescendants()) do
+            OptimizeInstance(instance)
+        end
+
+        if performanceState.connection then
+            performanceState.connection:Disconnect()
+        end
+        performanceState.connection = game.DescendantAdded:Connect(function(instance)
+            if _G.LowPerformanceMode then
+                task.defer(OptimizeInstance, instance)
+            end
+        end)
+
+        ShowScreenCover()
+        print("[Lag Saver] Enabled at " .. tostring(_G.LowPerformanceFPS) .. " FPS")
+    else
+        if performanceState.connection then
+            performanceState.connection:Disconnect()
+            performanceState.connection = nil
+        end
+
+        DestroyScreenCover()
+        RestoreOptimizedProperties()
+        SetFPSCap(performanceState.originalFPSCap or 60)
+        print("[Lag Saver] Disabled")
+    end
+end
+
+_G.ApplyLowPerformanceMode = ApplyLowPerformanceMode
+_G.SetLowPerformanceFPS = function(value)
+    _G.LowPerformanceFPS = ClampNumber(value, 5, 60)
+    if _G.LowPerformanceMode then
+        ApplyLowPerformanceMode(true)
+    end
+end
 
 -- ═══════════════════════════════════════════════════════
 -- 💾 DATA ENCODE / DECODE
@@ -249,7 +471,9 @@ local function SaveConfig()
             AutoGoodFarm = _G.AutoGoodFarm,
             GoodFarmQueue = _G.GoodFarmQueue,
             GoodFarmCurrentMode = _G.GoodFarmCurrentMode,
-            GoodFarmRoundsDone = _G.GoodFarmRoundsDone
+            GoodFarmRoundsDone = _G.GoodFarmRoundsDone,
+            LowPerformanceMode = _G.LowPerformanceMode,
+            LowPerformanceFPS = _G.LowPerformanceFPS
         }
         writefile(CONFIG_FILE, HttpService:JSONEncode(cfg))
     end)
@@ -293,6 +517,8 @@ local function LoadConfig()
             _G.AutoRejoinPS = data.AutoRejoinPS or false
             _G.AutoGoodFarm = data.AutoGoodFarm or false
             _G.GoodFarmRoundsDone = data.GoodFarmRoundsDone or 0
+            _G.LowPerformanceMode = data.LowPerformanceMode or false
+            _G.LowPerformanceFPS = ClampNumber(data.LowPerformanceFPS or 15, 5, 60)
             if data.GoodFarmQueue then
                 _G.GoodFarmQueue = data.GoodFarmQueue
                 -- เช็ค mode ที่ขาดแล้วเติมให้อัตโนมัติ (กรณี config เก่าไม่มี mode ใหม่)
@@ -308,6 +534,9 @@ local function LoadConfig()
                 end
             end
             _G.GoodFarmCurrentMode = data.GoodFarmCurrentMode or 1
+            if _G.LowPerformanceMode then
+                ApplyLowPerformanceMode(true)
+            end
         end
     end)
 end
