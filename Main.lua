@@ -24,8 +24,8 @@ local modules = {
     "StoryMode.lua",    -- 7. Auto Story + AI Tower Placement + Anti-AFK
     "MacroCore.lua",    -- 8. RunMacroLogic v3.2 NO SKIP
     "UI_Full.lua",      -- 9. Complete UI (LoadMainUI: all tabs)
-    "UI_Rayfield.lua",  -- 10. Rayfield UI shell + legacy fallback
-    "LoginUI.lua",      -- 10. Login Screen + Auth Check + Start (เรียก CheckAuth() เริ่มทำงาน)
+    "UI_Fluent.lua",    -- 10. Fluent Plus UI shell + legacy fallback
+    "LoginUI.lua",      -- 11. Login Screen + Auth Check + Start (เรียก CheckAuth() เริ่มทำงาน)
 }
 
 -- ═══════════════════════════════════════════════════════
