@@ -23,6 +23,7 @@ local AUTH_FILE = FOLDER.."/user_auth.json"
 local CONFIG_FILE = FOLDER.."/settings.json"
 local MAP_CONFIG_FILE = FOLDER.."/map_macros.json"
 local GOODFARM_STATE_FILE = FOLDER.."/goodfarm_state.json"
+local LAGSAVER_STATE_FILE = FOLDER.."/lag_saver_state.json"
 
 pcall(function()
     if not isfolder(FOLDER) then makefolder(FOLDER) end
@@ -48,6 +49,7 @@ _G._GOODFARM_STATE_FILE = GOODFARM_STATE_FILE
 _G._AUTH_FILE = AUTH_FILE
 _G._CONFIG_FILE = CONFIG_FILE
 _G._MAP_CONFIG_FILE = MAP_CONFIG_FILE
+_G._LAGSAVER_STATE_FILE = LAGSAVER_STATE_FILE
 
 -- ═══════════════════════════════════════════════════════
 -- 🎯 GLOBAL VARIABLES
@@ -254,6 +256,26 @@ local function RestoreOptimizedProperties()
 end
 
 local ApplyLowPerformanceMode
+
+local function SaveLagSaverState()
+    pcall(function()
+        writefile(LAGSAVER_STATE_FILE, HttpService:JSONEncode({
+            Enabled = _G.LowPerformanceMode and true or false,
+            FPS = ClampNumber(_G.LowPerformanceFPS or 15, 5, 60),
+            UpdatedAt = os.time()
+        }))
+    end)
+end
+
+local function LoadLagSaverState()
+    local state = nil
+    pcall(function()
+        if isfile and isfile(LAGSAVER_STATE_FILE) then
+            state = HttpService:JSONDecode(readfile(LAGSAVER_STATE_FILE))
+        end
+    end)
+    return state
+end
 
 local function DestroyScreenCover()
     if performanceState.screenCover then
@@ -518,6 +540,7 @@ end
 function ApplyLowPerformanceMode(enabled)
     _G.LowPerformanceMode = enabled and true or false
     _G.LowPerformanceFPS = ClampNumber(_G.LowPerformanceFPS, 5, 60)
+    SaveLagSaverState()
 
     if _G.LowPerformanceMode then
         if performanceState.originalFPSCap == nil then
@@ -576,6 +599,7 @@ end
 _G.ApplyLowPerformanceMode = ApplyLowPerformanceMode
 _G.SetLowPerformanceFPS = function(value)
     _G.LowPerformanceFPS = ClampNumber(value, 5, 60)
+    SaveLagSaverState()
     if _G.LowPerformanceMode then
         ApplyLowPerformanceMode(true)
     end
@@ -745,15 +769,28 @@ local function LoadConfig()
                 end
             end
             _G.GoodFarmCurrentMode = data.GoodFarmCurrentMode or 1
-            if _G.LowPerformanceMode then
-                ApplyLowPerformanceMode(true)
+        end
+
+        local lagState = LoadLagSaverState()
+        if type(lagState) == "table" then
+            if lagState.Enabled ~= nil then
+                _G.LowPerformanceMode = lagState.Enabled and true or false
             end
+            if lagState.FPS then
+                _G.LowPerformanceFPS = ClampNumber(lagState.FPS, 5, 60)
+            end
+        end
+
+        if _G.LowPerformanceMode then
+            ApplyLowPerformanceMode(true)
         end
     end)
 end
 
 _G.SaveConfig = SaveConfig
 _G.LoadConfig = LoadConfig
+_G.SaveLagSaverState = SaveLagSaverState
+_G.LoadLagSaverState = LoadLagSaverState
 
 -- ═══════════════════════════════════════════════════════
 -- 🗺️ MAP-MACRO BINDING SYSTEM
