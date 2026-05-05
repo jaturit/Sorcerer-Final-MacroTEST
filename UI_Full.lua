@@ -51,6 +51,38 @@ local PlacedTowers = {}
 local CasinoSelectedFile = _G.CasinoSelectedFile or "None"
 local CasinoNextSpawnType = "Defense"
 
+local function applyTextGlow(obj, color, thickness, transparency)
+    if not _G.CyberpunkUI or not obj then return end
+    local glow = Instance.new("UIStroke", obj)
+    glow.Name = "CyberTextGlow"
+    glow.ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual
+    glow.Color = color or obj.TextColor3
+    glow.Thickness = thickness or 1
+    glow.Transparency = transparency or 0.25
+    return glow
+end
+
+local function pulseTextGlow(obj, colorA, colorB)
+    if not _G.CyberpunkUI or not obj then return end
+    local glow = applyTextGlow(obj, colorA or obj.TextColor3, 1.3, 0.18)
+    task.spawn(function()
+        while glow and glow.Parent do
+            TweenService:Create(glow, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+                Color = colorB or Color3.fromRGB(0, 255, 255),
+                Transparency = 0.05
+            }):Play()
+            task.wait(0.85)
+            if not glow or not glow.Parent then break end
+            TweenService:Create(glow, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+                Color = colorA or obj.TextColor3,
+                Transparency = 0.22
+            }):Play()
+            task.wait(0.85)
+        end
+    end)
+    return glow
+end
+
 -- ═══════════════════════════════════════════════════════
 -- 🖥️ MAIN UI CREATION (Full: all tabs)
 -- ═══════════════════════════════════════════════════════
@@ -212,15 +244,15 @@ local function LoadMainUI()
 
         local OuterGlow = Instance.new("Frame", MainFrame)
         OuterGlow.Name = "CyberOuterGlow"
-        OuterGlow.Size = UDim2.new(1, 10, 1, 10)
-        OuterGlow.Position = UDim2.new(0, -5, 0, -5)
+        OuterGlow.Size = UDim2.new(1, 14, 1, 14)
+        OuterGlow.Position = UDim2.new(0, -7, 0, -7)
         OuterGlow.BackgroundTransparency = 1
         OuterGlow.ZIndex = 0
         OuterGlow.Parent = MainFrame
         Instance.new("UICorner", OuterGlow).CornerRadius = UDim.new(0, 16)
         local OuterStroke = Instance.new("UIStroke", OuterGlow)
-        OuterStroke.Thickness = 6
-        OuterStroke.Transparency = 0.7
+        OuterStroke.Thickness = 9
+        OuterStroke.Transparency = 0.48
         local OuterGradient = Instance.new("UIGradient", OuterStroke)
         OuterGradient.Color = CyberStrokeGradient.Color
 
@@ -234,7 +266,7 @@ local function LoadMainUI()
         Instance.new("UICorner", InnerGlow).CornerRadius = UDim.new(0, 10)
         local InnerStroke = Instance.new("UIStroke", InnerGlow)
         InnerStroke.Thickness = 1
-        InnerStroke.Transparency = 0.55
+        InnerStroke.Transparency = 0.28
         local InnerGradient = Instance.new("UIGradient", InnerStroke)
         InnerGradient.Color = ColorSequence.new({
             ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 20, 92)),
@@ -279,7 +311,7 @@ local function LoadMainUI()
     BackgroundImage.Position = UDim2.new(0, 0, 0, 0)
     BackgroundImage.BackgroundTransparency = 1
     BackgroundImage.Image = normalizeImageId(_G.UIBackgroundImage)
-    BackgroundImage.ImageTransparency = math.clamp(_G.UIBackgroundTransparency or 0.78, 0.35, 1)
+    BackgroundImage.ImageTransparency = math.clamp(_G.UIBackgroundTransparency or 0.52, 0.35, 1)
     BackgroundImage.ScaleType = Enum.ScaleType.Crop
     BackgroundImage.ZIndex = 1
     BackgroundImage.Visible = BackgroundImage.Image ~= ""
@@ -290,7 +322,7 @@ local function LoadMainUI()
     BackgroundShade.Name = "CyberBackgroundShade"
     BackgroundShade.Size = UDim2.new(1, 0, 1, 0)
     BackgroundShade.BackgroundColor3 = Color3.fromRGB(3, 4, 10)
-    BackgroundShade.BackgroundTransparency = 0.18
+    BackgroundShade.BackgroundTransparency = _G.CyberpunkUI and 0.48 or 0.18
     BackgroundShade.BorderSizePixel = 0
     BackgroundShade.ZIndex = 1
     BackgroundShade.Parent = MainFrame
@@ -298,10 +330,10 @@ local function LoadMainUI()
 
     local ScanLine = Instance.new("Frame", MainFrame)
     ScanLine.Name = "CyberScanLine"
-    ScanLine.Size = UDim2.new(0, 3, 1, -24)
+    ScanLine.Size = UDim2.new(0, 5, 1, -24)
     ScanLine.Position = UDim2.new(0, 0, 0, 12)
     ScanLine.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
-    ScanLine.BackgroundTransparency = _G.CyberpunkUI and 0.55 or 1
+    ScanLine.BackgroundTransparency = _G.CyberpunkUI and 0.32 or 1
     ScanLine.BorderSizePixel = 0
     ScanLine.ZIndex = 1
     ScanLine.Parent = MainFrame
@@ -368,6 +400,7 @@ local function LoadMainUI()
     AppTitle.Font = Enum.Font.GothamBold
     AppTitle.TextSize = 22
     AppTitle.ZIndex = 3
+    pulseTextGlow(AppTitle, Color3.fromRGB(255, 20, 92), Color3.fromRGB(0, 255, 255))
 
     local Subtitle = Instance.new("TextLabel", Sidebar)
     Subtitle.Text = _G.CyberpunkUI and "v3.2 // NEON MODE" or "v3.2 NO SKIP"
@@ -378,6 +411,7 @@ local function LoadMainUI()
     Subtitle.Font = Enum.Font.Gotham
     Subtitle.TextSize = 10
     Subtitle.ZIndex = 3
+    applyTextGlow(Subtitle, Color3.fromRGB(0, 255, 255), 0.8, 0.45)
 
     -- Key Status Display
     local KeyStatusFrame = Instance.new("Frame", Sidebar)
@@ -503,15 +537,31 @@ local function LoadMainUI()
     local function createContainer(parent, height)
         local c = Instance.new("Frame", parent)
         c.Size = UDim2.new(1, -20, 0, height)
-        c.BackgroundColor3 = Colors.MediumGray
-        c.BackgroundTransparency = 0.3
+        c.BackgroundColor3 = _G.CyberpunkUI and Color3.fromRGB(14, 15, 24) or Colors.MediumGray
+        c.BackgroundTransparency = _G.CyberpunkUI and 0.18 or 0.3
         c.ZIndex = 4
         c.ClipsDescendants = false
         Instance.new("UICorner", c).CornerRadius = UDim.new(0, 10)
         local stroke = Instance.new("UIStroke", c)
-        stroke.Color = Colors.NeonRed
-        stroke.Transparency = 0.7
-        stroke.Thickness = 1.5
+        stroke.Color = _G.CyberpunkUI and Color3.fromRGB(0, 255, 255) or Colors.NeonRed
+        stroke.Transparency = _G.CyberpunkUI and 0.35 or 0.7
+        stroke.Thickness = _G.CyberpunkUI and 2 or 1.5
+        if _G.CyberpunkUI then
+            local strokeGradient = Instance.new("UIGradient", stroke)
+            strokeGradient.Color = ColorSequence.new({
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 255)),
+                ColorSequenceKeypoint.new(0.45, Color3.fromRGB(255, 20, 92)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 235, 59)),
+            })
+            task.spawn(function()
+                local r = 0
+                while strokeGradient and strokeGradient.Parent do
+                    r = (r + 3) % 360
+                    strokeGradient.Rotation = r
+                    task.wait(0.05)
+                end
+            end)
+        end
         local layout = Instance.new("UIListLayout", c)
         layout.Padding = UDim.new(0, 6)
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -536,6 +586,7 @@ local function LoadMainUI()
         l.TextSize = 13
         l.TextXAlignment = Enum.TextXAlignment.Left
         l.ZIndex = 5
+        applyTextGlow(l, Color3.fromRGB(255, 20, 92), 0.8, 0.52)
         local btn = Instance.new("TextButton", f)
         btn.Size = UDim2.new(0, 42, 0, 22)
         btn.Position = UDim2.new(1, -52, 0.5, -11)
@@ -590,6 +641,7 @@ local function LoadMainUI()
         t.TextSize = 14
         t.TextXAlignment = Enum.TextXAlignment.Left
         t.ZIndex = 6
+        applyTextGlow(t, Color3.fromRGB(255, 20, 92), 0.9, 0.3)
         local d = Instance.new("TextLabel", btn)
         d.Text = desc
         d.Size = UDim2.new(1, -15, 0, 18)
@@ -855,6 +907,7 @@ local function LoadMainUI()
         btn.Font = Enum.Font.GothamMedium
         btn.TextSize = 12
         btn.ZIndex = 3
+        applyTextGlow(btn, Color3.fromRGB(255, 20, 92), 0.9, 0.38)
         Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
         local stroke = Instance.new("UIStroke", btn)
         stroke.Color = Colors.DarkRed
@@ -1188,6 +1241,7 @@ local function LoadMainUI()
     h1.TextSize = 15
     h1.TextXAlignment = Enum.TextXAlignment.Left
     h1.ZIndex = 4
+    pulseTextGlow(h1, Color3.fromRGB(255, 20, 92), Color3.fromRGB(0, 255, 255))
 
     -- Dashboard Stats Box
     local DashBox = createContainer(Page1, 210)
@@ -1307,8 +1361,9 @@ local function LoadMainUI()
     h1ctrl.TextSize = 15
     h1ctrl.TextXAlignment = Enum.TextXAlignment.Left
     h1ctrl.ZIndex = 4
+    pulseTextGlow(h1ctrl, Color3.fromRGB(255, 20, 92), Color3.fromRGB(255, 235, 59))
 
-    local MainBox = createContainer(Page1, 640)
+    local MainBox = createContainer(Page1, 780)
 
     _G.SetDashboardAutoPlay = createToggle(MainBox, "▶️ Auto Play Macro", _G.AutoPlay, function(v)
         _G._IsEventAutoPlay = false
@@ -1365,7 +1420,7 @@ local function LoadMainUI()
         SaveConfig()
     end)
 
-    createInput(MainBox, "BG Transparency", "0.35 ชัด / 0.85 ลาง", tostring(_G.UIBackgroundTransparency or 0.78), function(text)
+    createInput(MainBox, "BG Transparency", "0.35 ชัด / 0.85 ลาง", tostring(_G.UIBackgroundTransparency or 0.52), function(text)
         if _G.SetUIBackgroundTransparency then
             _G.SetUIBackgroundTransparency(text)
         else
@@ -4578,7 +4633,7 @@ local function LoadMainUI()
         end
     end)
 
-    local h3 = Instance.new("TextLabel", Page1)
+    local h3 = Instance.new("TextLabel", Page3)
     h3.Text = "🔔 DISCORD WEBHOOK"
     h3.Size = UDim2.new(1, -20, 0, 30)
     h3.BackgroundTransparency = 1
@@ -4587,8 +4642,9 @@ local function LoadMainUI()
     h3.TextSize = 15
     h3.TextXAlignment = Enum.TextXAlignment.Left
     h3.ZIndex = 4
+    pulseTextGlow(h3, Color3.fromRGB(255, 20, 92), Color3.fromRGB(0, 255, 255))
 
-    local DiscordBox = createContainer(Page1, 180)
+    local DiscordBox = createContainer(Page3, 180)
     local urlFrame = Instance.new("Frame", DiscordBox)
     urlFrame.Size = UDim2.new(1, -20, 0, 80)
     urlFrame.BackgroundTransparency = 1
@@ -4637,6 +4693,7 @@ local function LoadMainUI()
     createTab("📖 Story", Page6)
     createTab("🛒 Shop", Page7)
     createTab("🎪 Event", Page8)
+    createTab("📨 Discord", Page3)
 
     -- Logout Button (inside ButtonContainer so it scrolls with tabs)
     local LogoutBtn = Instance.new("TextButton", ButtonContainer)

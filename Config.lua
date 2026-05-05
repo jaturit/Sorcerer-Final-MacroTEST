@@ -69,8 +69,8 @@ _G.CasinoSelectedFile = "None"
 _G.LowPerformanceMode = false
 _G.LowPerformanceFPS = 15
 _G.CyberpunkUI = true
-_G.UIBackgroundImage = ""
-_G.UIBackgroundTransparency = 0.78
+_G.UIBackgroundImage = "rbxassetid://90298702993965"
+_G.UIBackgroundTransparency = 0.52
 
 -- Auto Story
 _G.AutoStory = false
@@ -527,8 +527,11 @@ local function LoadConfig()
             _G.LowPerformanceFPS = ClampNumber(data.LowPerformanceFPS or 15, 5, 60)
             _G.CyberpunkUI = data.CyberpunkUI
             if _G.CyberpunkUI == nil then _G.CyberpunkUI = true end
-            _G.UIBackgroundImage = data.UIBackgroundImage or ""
-            _G.UIBackgroundTransparency = ClampNumber(data.UIBackgroundTransparency or 0.78, 0.35, 1)
+            _G.UIBackgroundImage = data.UIBackgroundImage
+            if not _G.UIBackgroundImage or _G.UIBackgroundImage == "" then
+                _G.UIBackgroundImage = "rbxassetid://90298702993965"
+            end
+            _G.UIBackgroundTransparency = ClampNumber(data.UIBackgroundTransparency or 0.52, 0.35, 1)
             if data.GoodFarmQueue then
                 _G.GoodFarmQueue = data.GoodFarmQueue
                 -- เช็ค mode ที่ขาดแล้วเติมให้อัตโนมัติ (กรณี config เก่าไม่มี mode ใหม่)
