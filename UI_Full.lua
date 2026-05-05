@@ -4816,17 +4816,58 @@ local function LoadMainUI()
     local ToggleBtn = Instance.new("TextButton", ScreenGui)
     ToggleBtn.Size = UDim2.new(0, 55, 0, 55)
     ToggleBtn.Position = UDim2.new(0, 15, 0.5, -27)
-    ToggleBtn.BackgroundColor3 = Colors.Black
+    ToggleBtn.BackgroundColor3 = _G.CyberpunkUI and Color3.fromRGB(4, 8, 14) or Colors.Black
     ToggleBtn.Text = "⚡"
-    ToggleBtn.TextColor3 = Colors.NeonRed
+    ToggleBtn.TextColor3 = _G.CyberpunkUI and Color3.fromRGB(0, 255, 255) or Colors.NeonRed
     ToggleBtn.Font = Enum.Font.GothamBold
     ToggleBtn.TextSize = 22
     ToggleBtn.ZIndex = 50
+    ToggleBtn.ClipsDescendants = true
     Instance.new("UICorner", ToggleBtn).CornerRadius = UDim.new(1, 0)
     local toggleStroke = Instance.new("UIStroke", ToggleBtn)
-    toggleStroke.Color = Colors.NeonRed
-    toggleStroke.Thickness = 2
-    toggleStroke.Transparency = 0.3
+    toggleStroke.Color = _G.CyberpunkUI and Color3.fromRGB(0, 255, 255) or Colors.NeonRed
+    toggleStroke.Thickness = _G.CyberpunkUI and 3 or 2
+    toggleStroke.Transparency = _G.CyberpunkUI and 0.08 or 0.3
+    applyTextGlow(ToggleBtn, Color3.fromRGB(0, 255, 255), 1.4, 0.1)
+
+    if _G.CyberpunkUI then
+        local toggleGradient = Instance.new("UIGradient", toggleStroke)
+        toggleGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 255)),
+            ColorSequenceKeypoint.new(0.45, Color3.fromRGB(255, 235, 59)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 20, 92)),
+        })
+
+        local toggleRunner = Instance.new("Frame", ToggleBtn)
+        toggleRunner.Name = "CyberToggleButtonRunner"
+        toggleRunner.Size = UDim2.new(0, 12, 1, 8)
+        toggleRunner.Position = UDim2.new(0, -14, 0, -4)
+        toggleRunner.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        toggleRunner.BackgroundTransparency = 0.18
+        toggleRunner.BorderSizePixel = 0
+        toggleRunner.ZIndex = 51
+        local runnerGradient = Instance.new("UIGradient", toggleRunner)
+        runnerGradient.Rotation = 0
+        runnerGradient.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1),
+            NumberSequenceKeypoint.new(0.5, 0),
+            NumberSequenceKeypoint.new(1, 1),
+        })
+
+        task.spawn(function()
+            local r = 0
+            while toggleGradient and toggleGradient.Parent do
+                r = (r + 4) % 360
+                toggleGradient.Rotation = r
+                ToggleBtn.Rotation = math.sin(tick() * 2) * 3
+                toggleRunner.Position = UDim2.new(0, -14, 0, -4)
+                TweenService:Create(toggleRunner, TweenInfo.new(0.75, Enum.EasingStyle.Linear), {
+                    Position = UDim2.new(1, 2, 0, -4)
+                }):Play()
+                task.wait(0.8)
+            end
+        end)
+    end
 
     task.spawn(function()
         while toggleStroke and toggleStroke.Parent do
