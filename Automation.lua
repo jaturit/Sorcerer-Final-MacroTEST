@@ -41,7 +41,8 @@ end)
 -- ═══════════════════════════════════════════════════════
 
 local function SendGameEndNotification()
-    if not _G.DiscordURL or _G.DiscordURL == "" then
+    local hasWebhook = _G.DiscordURL and _G.DiscordURL ~= ""
+    if not hasWebhook then
         if _G.AutoStory then
             pcall(function()
                 local nextStage, nextDiff = _G.GetNextStoryStage()
@@ -57,7 +58,6 @@ local function SendGameEndNotification()
                 end
             end)
         end
-        return
     end
 
     task.wait(1.5)
@@ -202,8 +202,21 @@ local function SendGameEndNotification()
     end
 
     local resultMsg = table.concat(lines, "\n")
-    SendWebhook(resultMsg, true)
-    print("📤 Discord sent | Victory: " .. tostring(isVictory) .. " | Rewards: " .. #rewardLines)
+    _G.LastGameResult = {
+        Text = resultMsg,
+        Map = mapName,
+        IsVictory = isVictory,
+        Rewards = rewardLines,
+        UpdatedAt = os.date("%H:%M:%S")
+    }
+    _G.LagSaverStatus = isVictory and "Run completed: VICTORY" or "Run ended: GAME OVER"
+
+    if hasWebhook then
+        SendWebhook(resultMsg, true)
+        print("📤 Discord sent | Victory: " .. tostring(isVictory) .. " | Rewards: " .. #rewardLines)
+    else
+        print("📺 Lag Saver result cached | Victory: " .. tostring(isVictory) .. " | Rewards: " .. #rewardLines)
+    end
 end
 
 -- ═══════════════════════════════════════════════════════

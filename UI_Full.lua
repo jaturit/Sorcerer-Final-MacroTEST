@@ -4838,33 +4838,13 @@ local function LoadMainUI()
             ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 20, 92)),
         })
 
-        local toggleRunner = Instance.new("Frame", ToggleBtn)
-        toggleRunner.Name = "CyberToggleButtonRunner"
-        toggleRunner.Size = UDim2.new(0, 12, 1, 8)
-        toggleRunner.Position = UDim2.new(0, -14, 0, -4)
-        toggleRunner.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        toggleRunner.BackgroundTransparency = 0.18
-        toggleRunner.BorderSizePixel = 0
-        toggleRunner.ZIndex = 51
-        local runnerGradient = Instance.new("UIGradient", toggleRunner)
-        runnerGradient.Rotation = 0
-        runnerGradient.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 1),
-            NumberSequenceKeypoint.new(0.5, 0),
-            NumberSequenceKeypoint.new(1, 1),
-        })
-
         task.spawn(function()
             local r = 0
             while toggleGradient and toggleGradient.Parent do
-                r = (r + 4) % 360
+                r = (r + 6) % 360
                 toggleGradient.Rotation = r
-                ToggleBtn.Rotation = math.sin(tick() * 2) * 3
-                toggleRunner.Position = UDim2.new(0, -14, 0, -4)
-                TweenService:Create(toggleRunner, TweenInfo.new(0.75, Enum.EasingStyle.Linear), {
-                    Position = UDim2.new(1, 2, 0, -4)
-                }):Play()
-                task.wait(0.8)
+                toggleStroke.Transparency = 0.04 + (math.sin(tick() * 5) + 1) * 0.06
+                task.wait(0.03)
             end
         end)
     end

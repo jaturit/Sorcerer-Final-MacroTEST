@@ -264,6 +264,53 @@ local function DestroyScreenCover()
     end
 end
 
+local function GetLagSaverStatusText()
+    if _G.AutoGoodFarm then
+        local status = nil
+        pcall(function()
+            status = _G._GoodFarmStatusLabel and _G._GoodFarmStatusLabel.Text
+        end)
+        return status or "Good Farm is running"
+    end
+    if _G.AutoCasinoPlay or _G.AutoCasinoEnabled then
+        return "Casino macro is running"
+    end
+    if _G.AutoStory then
+        return "Auto Story is running"
+    end
+    if _G.StoryMacroMode then
+        return "Story macro mode is running"
+    end
+    if _G.AutoEvent or _G.AutoEventMacro then
+        return "Event automation is running"
+    end
+    if _G.MacroRunning or _G.AutoPlay then
+        return "Macro is running"
+    end
+    return _G.LagSaverStatus or "Waiting for automation"
+end
+
+local function GetLagSaverDashboardText()
+    local text = ""
+    pcall(function()
+        if _G.GetDashboardText then
+            text = _G.GetDashboardText()
+        end
+    end)
+    if text == "" then
+        text = "Dashboard data will appear after the first cache update"
+    end
+    return text
+end
+
+local function GetLagSaverResultText()
+    local result = _G.LastGameResult
+    if type(result) == "table" and result.Text and result.Text ~= "" then
+        return result.Text
+    end
+    return "No completed run yet"
+end
+
 local function ShowScreenCover()
     DestroyScreenCover()
 
@@ -275,24 +322,167 @@ local function ShowScreenCover()
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
     local cover = Instance.new("Frame", gui)
-    cover.Name = "WhiteCover"
+    cover.Name = "LagSaverStatusCover"
     cover.Size = UDim2.new(1, 0, 1, 0)
     cover.Position = UDim2.new(0, 0, 0, 0)
-    cover.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    cover.BackgroundColor3 = Color3.fromRGB(3, 5, 10)
     cover.BorderSizePixel = 0
     cover.ZIndex = 10000
 
+    local topLine = Instance.new("Frame", cover)
+    topLine.Size = UDim2.new(1, 0, 0, 3)
+    topLine.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
+    topLine.BorderSizePixel = 0
+    topLine.ZIndex = 10001
+
+    local title = Instance.new("TextLabel", cover)
+    title.Size = UDim2.new(1, -40, 0, 46)
+    title.Position = UDim2.new(0, 24, 0, 18)
+    title.BackgroundTransparency = 1
+    title.Text = "LAG SAVER // BOT STATUS"
+    title.TextColor3 = Color3.fromRGB(0, 255, 255)
+    title.Font = Enum.Font.GothamBlack
+    title.TextSize = 24
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.ZIndex = 10001
+    local titleGlow = Instance.new("UIStroke", title)
+    titleGlow.Color = Color3.fromRGB(0, 180, 255)
+    titleGlow.Thickness = 1
+    titleGlow.Transparency = 0.25
+
+    local subtitle = Instance.new("TextLabel", cover)
+    subtitle.Size = UDim2.new(1, -40, 0, 24)
+    subtitle.Position = UDim2.new(0, 26, 0, 60)
+    subtitle.BackgroundTransparency = 1
+    subtitle.Text = "Rendering is covered. Macro logic continues in the background."
+    subtitle.TextColor3 = Color3.fromRGB(190, 210, 220)
+    subtitle.Font = Enum.Font.GothamMedium
+    subtitle.TextSize = 12
+    subtitle.TextXAlignment = Enum.TextXAlignment.Left
+    subtitle.ZIndex = 10001
+
+    local panel = Instance.new("Frame", cover)
+    panel.Size = UDim2.new(0, 620, 0, 360)
+    panel.Position = UDim2.new(0.5, -310, 0.5, -180)
+    panel.BackgroundColor3 = Color3.fromRGB(8, 10, 18)
+    panel.BackgroundTransparency = 0.08
+    panel.BorderSizePixel = 0
+    panel.ZIndex = 10001
+    Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 10)
+    local panelStroke = Instance.new("UIStroke", panel)
+    panelStroke.Color = Color3.fromRGB(0, 255, 255)
+    panelStroke.Thickness = 2
+    panelStroke.Transparency = 0.2
+
+    local accent = Instance.new("Frame", panel)
+    accent.Size = UDim2.new(0, 5, 1, -24)
+    accent.Position = UDim2.new(0, 14, 0, 12)
+    accent.BackgroundColor3 = Color3.fromRGB(255, 235, 59)
+    accent.BorderSizePixel = 0
+    accent.ZIndex = 10002
+
+    local statusLabel = Instance.new("TextLabel", panel)
+    statusLabel.Size = UDim2.new(1, -60, 0, 34)
+    statusLabel.Position = UDim2.new(0, 34, 0, 24)
+    statusLabel.BackgroundTransparency = 1
+    statusLabel.TextColor3 = Color3.fromRGB(0, 255, 140)
+    statusLabel.Font = Enum.Font.GothamBold
+    statusLabel.TextSize = 18
+    statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    statusLabel.ZIndex = 10002
+
+    local macroLabel = Instance.new("TextLabel", panel)
+    macroLabel.Size = UDim2.new(1, -60, 0, 24)
+    macroLabel.Position = UDim2.new(0, 34, 0, 64)
+    macroLabel.BackgroundTransparency = 1
+    macroLabel.TextColor3 = Color3.fromRGB(235, 245, 255)
+    macroLabel.Font = Enum.Font.GothamMedium
+    macroLabel.TextSize = 13
+    macroLabel.TextXAlignment = Enum.TextXAlignment.Left
+    macroLabel.ZIndex = 10002
+
+    local waveLabel = Instance.new("TextLabel", panel)
+    waveLabel.Size = UDim2.new(1, -60, 0, 24)
+    waveLabel.Position = UDim2.new(0, 34, 0, 92)
+    waveLabel.BackgroundTransparency = 1
+    waveLabel.TextColor3 = Color3.fromRGB(255, 235, 59)
+    waveLabel.Font = Enum.Font.GothamMedium
+    waveLabel.TextSize = 13
+    waveLabel.TextXAlignment = Enum.TextXAlignment.Left
+    waveLabel.ZIndex = 10002
+
+    local dashboardTitle = Instance.new("TextLabel", panel)
+    dashboardTitle.Size = UDim2.new(1, -60, 0, 22)
+    dashboardTitle.Position = UDim2.new(0, 34, 0, 128)
+    dashboardTitle.BackgroundTransparency = 1
+    dashboardTitle.Text = "DASHBOARD CACHE"
+    dashboardTitle.TextColor3 = Color3.fromRGB(0, 255, 255)
+    dashboardTitle.Font = Enum.Font.GothamBold
+    dashboardTitle.TextSize = 12
+    dashboardTitle.TextXAlignment = Enum.TextXAlignment.Left
+    dashboardTitle.ZIndex = 10002
+
+    local dashboardLabel = Instance.new("TextLabel", panel)
+    dashboardLabel.Size = UDim2.new(1, -60, 0, 48)
+    dashboardLabel.Position = UDim2.new(0, 34, 0, 152)
+    dashboardLabel.BackgroundColor3 = Color3.fromRGB(12, 15, 24)
+    dashboardLabel.BackgroundTransparency = 0.15
+    dashboardLabel.TextColor3 = Color3.fromRGB(230, 240, 245)
+    dashboardLabel.Font = Enum.Font.Gotham
+    dashboardLabel.TextSize = 12
+    dashboardLabel.TextWrapped = true
+    dashboardLabel.TextXAlignment = Enum.TextXAlignment.Left
+    dashboardLabel.TextYAlignment = Enum.TextYAlignment.Center
+    dashboardLabel.ZIndex = 10002
+    Instance.new("UICorner", dashboardLabel).CornerRadius = UDim.new(0, 6)
+    local dashboardPad = Instance.new("UIPadding", dashboardLabel)
+    dashboardPad.PaddingLeft = UDim.new(0, 10)
+    dashboardPad.PaddingRight = UDim.new(0, 10)
+
+    local resultTitle = Instance.new("TextLabel", panel)
+    resultTitle.Size = UDim2.new(1, -60, 0, 22)
+    resultTitle.Position = UDim2.new(0, 34, 0, 214)
+    resultTitle.BackgroundTransparency = 1
+    resultTitle.Text = "LAST RUN RESULT"
+    resultTitle.TextColor3 = Color3.fromRGB(255, 20, 92)
+    resultTitle.Font = Enum.Font.GothamBold
+    resultTitle.TextSize = 12
+    resultTitle.TextXAlignment = Enum.TextXAlignment.Left
+    resultTitle.ZIndex = 10002
+
+    local resultLabel = Instance.new("TextLabel", panel)
+    resultLabel.Size = UDim2.new(1, -60, 0, 96)
+    resultLabel.Position = UDim2.new(0, 34, 0, 238)
+    resultLabel.BackgroundColor3 = Color3.fromRGB(12, 15, 24)
+    resultLabel.BackgroundTransparency = 0.15
+    resultLabel.TextColor3 = Color3.fromRGB(230, 240, 245)
+    resultLabel.Font = Enum.Font.Gotham
+    resultLabel.TextSize = 11
+    resultLabel.TextWrapped = true
+    resultLabel.TextXAlignment = Enum.TextXAlignment.Left
+    resultLabel.TextYAlignment = Enum.TextYAlignment.Top
+    resultLabel.ZIndex = 10002
+    Instance.new("UICorner", resultLabel).CornerRadius = UDim.new(0, 6)
+    local resultPad = Instance.new("UIPadding", resultLabel)
+    resultPad.PaddingTop = UDim.new(0, 8)
+    resultPad.PaddingLeft = UDim.new(0, 10)
+    resultPad.PaddingRight = UDim.new(0, 10)
+
     local offButton = Instance.new("TextButton", cover)
     offButton.Name = "DisableLagSaver"
-    offButton.Size = UDim2.new(0, 170, 0, 38)
-    offButton.Position = UDim2.new(1, -185, 0, 15)
-    offButton.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-    offButton.Text = "LAG SAVER: ON"
-    offButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    offButton.Size = UDim2.new(0, 190, 0, 40)
+    offButton.Position = UDim2.new(1, -210, 0, 18)
+    offButton.BackgroundColor3 = Color3.fromRGB(10, 12, 20)
+    offButton.Text = "DISABLE LAG SAVER"
+    offButton.TextColor3 = Color3.fromRGB(0, 255, 255)
     offButton.Font = Enum.Font.GothamBold
-    offButton.TextSize = 13
+    offButton.TextSize = 12
     offButton.ZIndex = 10001
     Instance.new("UICorner", offButton).CornerRadius = UDim.new(0, 8)
+    local offStroke = Instance.new("UIStroke", offButton)
+    offStroke.Color = Color3.fromRGB(0, 255, 255)
+    offStroke.Thickness = 1.5
+    offStroke.Transparency = 0.25
 
     offButton.MouseButton1Click:Connect(function()
         ApplyLowPerformanceMode(false)
@@ -312,6 +502,17 @@ local function ShowScreenCover()
     end
 
     performanceState.screenCover = gui
+
+    task.spawn(function()
+        while performanceState.screenCover == gui and gui.Parent do
+            statusLabel.Text = "STATUS: " .. GetLagSaverStatusText()
+            macroLabel.Text = "MACRO: " .. tostring(_G.SelectedFile or "None") .. "   |   CASINO: " .. tostring(_G.CasinoSelectedFile or "None")
+            waveLabel.Text = "WAVE: " .. tostring(_G._CurrentWave or 0) .. "   |   FPS CAP: " .. tostring(_G.LowPerformanceFPS or 15)
+            dashboardLabel.Text = GetLagSaverDashboardText()
+            resultLabel.Text = GetLagSaverResultText()
+            task.wait(1)
+        end
+    end)
 end
 
 function ApplyLowPerformanceMode(enabled)
@@ -344,8 +545,13 @@ function ApplyLowPerformanceMode(enabled)
             SetOptimizedProperty(terrain, "Decoration", false)
         end
 
+        local optimizedCount = 0
         for _, instance in ipairs(game:GetDescendants()) do
             OptimizeInstance(instance)
+            optimizedCount = optimizedCount + 1
+            if optimizedCount % 120 == 0 then
+                task.wait()
+            end
         end
 
         if performanceState.connection then
