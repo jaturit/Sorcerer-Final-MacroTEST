@@ -527,10 +527,7 @@ local function LoadConfig()
             _G.LowPerformanceFPS = ClampNumber(data.LowPerformanceFPS or 15, 5, 60)
             _G.CyberpunkUI = data.CyberpunkUI
             if _G.CyberpunkUI == nil then _G.CyberpunkUI = true end
-            _G.UIBackgroundImage = data.UIBackgroundImage
-            if not _G.UIBackgroundImage or _G.UIBackgroundImage == "" then
-                _G.UIBackgroundImage = "rbxassetid://90298702993965"
-            end
+            _G.UIBackgroundImage = "rbxassetid://90298702993965"
             _G.UIBackgroundTransparency = ClampNumber(data.UIBackgroundTransparency or 0.52, 0.35, 1)
             if data.GoodFarmQueue then
                 _G.GoodFarmQueue = data.GoodFarmQueue
