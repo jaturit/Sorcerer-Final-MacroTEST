@@ -545,13 +545,8 @@ function ApplyLowPerformanceMode(enabled)
             SetOptimizedProperty(terrain, "Decoration", false)
         end
 
-        local optimizedCount = 0
         for _, instance in ipairs(game:GetDescendants()) do
             OptimizeInstance(instance)
-            optimizedCount = optimizedCount + 1
-            if optimizedCount % 120 == 0 then
-                task.wait()
-            end
         end
 
         if performanceState.connection then
