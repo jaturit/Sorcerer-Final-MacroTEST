@@ -12,6 +12,7 @@ local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
+local ContentProvider = game:GetService("ContentProvider")
 
 local Request = request or http_request or (syn and syn.request) or (http and http.request) or (fluxus and fluxus.request) or function() return nil end
 
@@ -24,6 +25,9 @@ local CONFIG_FILE = FOLDER.."/settings.json"
 local MAP_CONFIG_FILE = FOLDER.."/map_macros.json"
 local GOODFARM_STATE_FILE = FOLDER.."/goodfarm_state.json"
 local LAGSAVER_STATE_FILE = FOLDER.."/lag_saver_state.json"
+local CULLING_POINTS_FILE = FOLDER.."/culling_points.txt"
+local LAST_RESULT_FILE = FOLDER.."/last_run_result.json"
+local LAGSAVER_BACKGROUND_IMAGE = "rbxassetid://85556556528294"
 
 pcall(function()
     if not isfolder(FOLDER) then makefolder(FOLDER) end
@@ -39,6 +43,7 @@ _G._Services = {
     TweenService = TweenService,
     RunService = RunService,
     Lighting = Lighting,
+    ContentProvider = ContentProvider,
 }
 _G._Request = Request
 _G._Player = Player
@@ -50,6 +55,8 @@ _G._AUTH_FILE = AUTH_FILE
 _G._CONFIG_FILE = CONFIG_FILE
 _G._MAP_CONFIG_FILE = MAP_CONFIG_FILE
 _G._LAGSAVER_STATE_FILE = LAGSAVER_STATE_FILE
+_G._CULLING_POINTS_FILE = CULLING_POINTS_FILE
+_G._LAST_RESULT_FILE = LAST_RESULT_FILE
 
 -- ═══════════════════════════════════════════════════════
 -- 🎯 GLOBAL VARIABLES
@@ -60,6 +67,9 @@ _G.FileName = ""
 _G.AutoReplay = false
 _G.AutoSkip = false
 _G.AutoPlay = false
+_G.AutoUpgrade = false
+_G.AutoUpgradeRunning = false
+_G.CasinoMacroRunning = false
 _G.DiscordURL = ""
 _G.AutoJoinCasino = false
 _G.AutoToLobby = false
@@ -73,6 +83,7 @@ _G.LowPerformanceFPS = 15
 _G.CyberpunkUI = true
 _G.UIBackgroundImage = "rbxassetid://90298702993965"
 _G.UIBackgroundTransparency = 0.52
+_G.LagSaverBackgroundImage = LAGSAVER_BACKGROUND_IMAGE
 
 -- Auto Story
 _G.AutoStory = false
@@ -286,6 +297,22 @@ local function DestroyScreenCover()
     end
 end
 
+local function NormalizeImageId(value)
+    value = tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if value == "" or value == "0" then return "" end
+    if value:match("^%d+$") then
+        return "rbxassetid://" .. value
+    end
+    return value
+end
+
+local function GetAssetThumbnailId(value)
+    value = tostring(value or "")
+    local id = value:match("rbxassetid://(%d+)") or value:match("id=(%d+)") or value:match("^(%d+)$")
+    if not id then return "" end
+    return "rbxthumb://type=Asset&id=" .. id .. "&w=720&h=720"
+end
+
 local function GetLagSaverStatusText()
     if _G.AutoGoodFarm then
         local status = nil
@@ -325,9 +352,53 @@ local function GetLagSaverDashboardText()
     return text
 end
 
+local function GetCullingPointsText()
+    local points = nil
+    pcall(function()
+        local cg = PlayerGui:FindFirstChild("CullingGames")
+        if cg then
+            local tp = cg:FindFirstChild("Teleport")
+            if tp and tp.Visible then
+                for _, v in pairs(tp:GetChildren()) do
+                    if v:IsA("TextLabel") and v.Text and v.Text ~= "" then
+                        local pts = v.Text:match("Culling Points:%s*(%d+)") or v.Text:match("^(%d+)$")
+                        if pts then
+                            points = pts
+                            if writefile then
+                                writefile(CULLING_POINTS_FILE, pts)
+                            end
+                            break
+                        end
+                    end
+                end
+            end
+        end
+    end)
+    if not points then
+        pcall(function()
+            if isfile and isfile(CULLING_POINTS_FILE) then
+                points = readfile(CULLING_POINTS_FILE)
+            end
+        end)
+    end
+    return points or "---"
+end
+
 local function GetLagSaverResultText()
     local result = _G.LastGameResult
     if type(result) == "table" and result.Text and result.Text ~= "" then
+        return result.Text
+    end
+    pcall(function()
+        if isfile and isfile(LAST_RESULT_FILE) then
+            local data = HttpService:JSONDecode(readfile(LAST_RESULT_FILE))
+            if type(data) == "table" and data.Text and data.Text ~= "" then
+                result = data
+            end
+        end
+    end)
+    if type(result) == "table" and result.Text and result.Text ~= "" then
+        _G.LastGameResult = result
         return result.Text
     end
     return "No completed run yet"
@@ -351,6 +422,29 @@ local function ShowScreenCover()
     cover.BorderSizePixel = 0
     cover.ZIndex = 10000
 
+    local backgroundImage = Instance.new("ImageLabel", cover)
+    backgroundImage.Name = "LagSaverBackgroundImage"
+    backgroundImage.AnchorPoint = Vector2.new(0.5, 0.5)
+    backgroundImage.Size = UDim2.new(0.82, 0, 0.82, 0)
+    backgroundImage.Position = UDim2.new(0.5, 0, 0.5, 0)
+    backgroundImage.BackgroundTransparency = 1
+    backgroundImage.Image = NormalizeImageId(_G.LagSaverBackgroundImage or LAGSAVER_BACKGROUND_IMAGE)
+    backgroundImage.ImageTransparency = 0.03
+    backgroundImage.ScaleType = Enum.ScaleType.Fit
+    backgroundImage.Visible = backgroundImage.Image ~= ""
+    backgroundImage.ZIndex = 10000
+    pcall(function()
+        backgroundImage.ResampleMode = Enum.ResamplerMode.Default
+    end)
+
+    local backgroundDim = Instance.new("Frame", cover)
+    backgroundDim.Name = "LagSaverBackgroundDim"
+    backgroundDim.Size = UDim2.new(1, 0, 1, 0)
+    backgroundDim.BackgroundColor3 = Color3.fromRGB(3, 5, 10)
+    backgroundDim.BackgroundTransparency = 0.64
+    backgroundDim.BorderSizePixel = 0
+    backgroundDim.ZIndex = 10001
+
     local topLine = Instance.new("Frame", cover)
     topLine.Size = UDim2.new(1, 0, 0, 3)
     topLine.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
@@ -358,54 +452,60 @@ local function ShowScreenCover()
     topLine.ZIndex = 10001
 
     local title = Instance.new("TextLabel", cover)
-    title.Size = UDim2.new(1, -40, 0, 46)
-    title.Position = UDim2.new(0, 24, 0, 18)
+    title.Size = UDim2.new(1, -240, 0, 34)
+    title.Position = UDim2.new(0, 34, 0, 14)
     title.BackgroundTransparency = 1
     title.Text = "LAG SAVER // BOT STATUS"
     title.TextColor3 = Color3.fromRGB(0, 255, 255)
     title.Font = Enum.Font.GothamBlack
-    title.TextSize = 24
+    title.TextSize = 18
     title.TextXAlignment = Enum.TextXAlignment.Left
-    title.ZIndex = 10001
+    title.ZIndex = 10003
     local titleGlow = Instance.new("UIStroke", title)
     titleGlow.Color = Color3.fromRGB(0, 180, 255)
     titleGlow.Thickness = 1
     titleGlow.Transparency = 0.25
 
     local subtitle = Instance.new("TextLabel", cover)
-    subtitle.Size = UDim2.new(1, -40, 0, 24)
-    subtitle.Position = UDim2.new(0, 26, 0, 60)
+    subtitle.Size = UDim2.new(1, -70, 0, 20)
+    subtitle.Position = UDim2.new(0, 34, 0, 44)
     subtitle.BackgroundTransparency = 1
     subtitle.Text = "Rendering is covered. Macro logic continues in the background."
     subtitle.TextColor3 = Color3.fromRGB(190, 210, 220)
     subtitle.Font = Enum.Font.GothamMedium
     subtitle.TextSize = 12
     subtitle.TextXAlignment = Enum.TextXAlignment.Left
-    subtitle.ZIndex = 10001
+    subtitle.ZIndex = 10003
 
     local panel = Instance.new("Frame", cover)
-    panel.Size = UDim2.new(0, 620, 0, 360)
-    panel.Position = UDim2.new(0.5, -310, 0.5, -180)
+    panel.AnchorPoint = Vector2.new(0.5, 0.5)
+    panel.Size = UDim2.new(0.78, 0, 0.86, 0)
+    panel.Position = UDim2.new(0.5, 0, 0.5, 0)
     panel.BackgroundColor3 = Color3.fromRGB(8, 10, 18)
-    panel.BackgroundTransparency = 0.08
+    panel.BackgroundTransparency = 0.16
     panel.BorderSizePixel = 0
-    panel.ZIndex = 10001
+    panel.ZIndex = 10002
     Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 10)
+    local panelSize = Instance.new("UISizeConstraint", panel)
+    panelSize.MinSize = Vector2.new(460, 360)
+    panelSize.MaxSize = Vector2.new(860, 470)
     local panelStroke = Instance.new("UIStroke", panel)
     panelStroke.Color = Color3.fromRGB(0, 255, 255)
     panelStroke.Thickness = 2
     panelStroke.Transparency = 0.2
+    title.Parent = panel
+    subtitle.Parent = panel
 
     local accent = Instance.new("Frame", panel)
-    accent.Size = UDim2.new(0, 5, 1, -24)
-    accent.Position = UDim2.new(0, 14, 0, 12)
+    accent.Size = UDim2.new(0, 5, 1, -28)
+    accent.Position = UDim2.new(0, 18, 0, 14)
     accent.BackgroundColor3 = Color3.fromRGB(255, 235, 59)
     accent.BorderSizePixel = 0
     accent.ZIndex = 10002
 
     local statusLabel = Instance.new("TextLabel", panel)
-    statusLabel.Size = UDim2.new(1, -60, 0, 34)
-    statusLabel.Position = UDim2.new(0, 34, 0, 24)
+    statusLabel.Size = UDim2.new(1, -60, 0, 30)
+    statusLabel.Position = UDim2.new(0, 34, 0, 76)
     statusLabel.BackgroundTransparency = 1
     statusLabel.TextColor3 = Color3.fromRGB(0, 255, 140)
     statusLabel.Font = Enum.Font.GothamBold
@@ -415,7 +515,7 @@ local function ShowScreenCover()
 
     local macroLabel = Instance.new("TextLabel", panel)
     macroLabel.Size = UDim2.new(1, -60, 0, 24)
-    macroLabel.Position = UDim2.new(0, 34, 0, 64)
+    macroLabel.Position = UDim2.new(0, 34, 0, 110)
     macroLabel.BackgroundTransparency = 1
     macroLabel.TextColor3 = Color3.fromRGB(235, 245, 255)
     macroLabel.Font = Enum.Font.GothamMedium
@@ -425,7 +525,7 @@ local function ShowScreenCover()
 
     local waveLabel = Instance.new("TextLabel", panel)
     waveLabel.Size = UDim2.new(1, -60, 0, 24)
-    waveLabel.Position = UDim2.new(0, 34, 0, 92)
+    waveLabel.Position = UDim2.new(0, 34, 0, 136)
     waveLabel.BackgroundTransparency = 1
     waveLabel.TextColor3 = Color3.fromRGB(255, 235, 59)
     waveLabel.Font = Enum.Font.GothamMedium
@@ -433,9 +533,19 @@ local function ShowScreenCover()
     waveLabel.TextXAlignment = Enum.TextXAlignment.Left
     waveLabel.ZIndex = 10002
 
+    local cullingLabel = Instance.new("TextLabel", panel)
+    cullingLabel.Size = UDim2.new(1, -60, 0, 24)
+    cullingLabel.Position = UDim2.new(0, 34, 0, 162)
+    cullingLabel.BackgroundTransparency = 1
+    cullingLabel.TextColor3 = Color3.fromRGB(255, 208, 64)
+    cullingLabel.Font = Enum.Font.GothamBold
+    cullingLabel.TextSize = 13
+    cullingLabel.TextXAlignment = Enum.TextXAlignment.Left
+    cullingLabel.ZIndex = 10002
+
     local dashboardTitle = Instance.new("TextLabel", panel)
     dashboardTitle.Size = UDim2.new(1, -60, 0, 22)
-    dashboardTitle.Position = UDim2.new(0, 34, 0, 128)
+    dashboardTitle.Position = UDim2.new(0, 34, 0, 194)
     dashboardTitle.BackgroundTransparency = 1
     dashboardTitle.Text = "DASHBOARD CACHE"
     dashboardTitle.TextColor3 = Color3.fromRGB(0, 255, 255)
@@ -445,8 +555,8 @@ local function ShowScreenCover()
     dashboardTitle.ZIndex = 10002
 
     local dashboardLabel = Instance.new("TextLabel", panel)
-    dashboardLabel.Size = UDim2.new(1, -60, 0, 48)
-    dashboardLabel.Position = UDim2.new(0, 34, 0, 152)
+    dashboardLabel.Size = UDim2.new(1, -60, 0, 44)
+    dashboardLabel.Position = UDim2.new(0, 34, 0, 218)
     dashboardLabel.BackgroundColor3 = Color3.fromRGB(12, 15, 24)
     dashboardLabel.BackgroundTransparency = 0.15
     dashboardLabel.TextColor3 = Color3.fromRGB(230, 240, 245)
@@ -463,7 +573,7 @@ local function ShowScreenCover()
 
     local resultTitle = Instance.new("TextLabel", panel)
     resultTitle.Size = UDim2.new(1, -60, 0, 22)
-    resultTitle.Position = UDim2.new(0, 34, 0, 214)
+    resultTitle.Position = UDim2.new(0, 34, 0, 274)
     resultTitle.BackgroundTransparency = 1
     resultTitle.Text = "LAST RUN RESULT"
     resultTitle.TextColor3 = Color3.fromRGB(255, 20, 92)
@@ -473,8 +583,8 @@ local function ShowScreenCover()
     resultTitle.ZIndex = 10002
 
     local resultLabel = Instance.new("TextLabel", panel)
-    resultLabel.Size = UDim2.new(1, -60, 0, 96)
-    resultLabel.Position = UDim2.new(0, 34, 0, 238)
+    resultLabel.Size = UDim2.new(1, -60, 1, -326)
+    resultLabel.Position = UDim2.new(0, 34, 0, 298)
     resultLabel.BackgroundColor3 = Color3.fromRGB(12, 15, 24)
     resultLabel.BackgroundTransparency = 0.15
     resultLabel.TextColor3 = Color3.fromRGB(230, 240, 245)
@@ -490,16 +600,16 @@ local function ShowScreenCover()
     resultPad.PaddingLeft = UDim.new(0, 10)
     resultPad.PaddingRight = UDim.new(0, 10)
 
-    local offButton = Instance.new("TextButton", cover)
+    local offButton = Instance.new("TextButton", panel)
     offButton.Name = "DisableLagSaver"
-    offButton.Size = UDim2.new(0, 190, 0, 40)
-    offButton.Position = UDim2.new(1, -210, 0, 18)
+    offButton.Size = UDim2.new(0, 180, 0, 34)
+    offButton.Position = UDim2.new(1, -200, 0, 18)
     offButton.BackgroundColor3 = Color3.fromRGB(10, 12, 20)
-    offButton.Text = "DISABLE LAG SAVER"
+    offButton.Text = "EXIT"
     offButton.TextColor3 = Color3.fromRGB(0, 255, 255)
     offButton.Font = Enum.Font.GothamBold
     offButton.TextSize = 12
-    offButton.ZIndex = 10001
+    offButton.ZIndex = 10003
     Instance.new("UICorner", offButton).CornerRadius = UDim.new(0, 8)
     local offStroke = Instance.new("UIStroke", offButton)
     offStroke.Color = Color3.fromRGB(0, 255, 255)
@@ -526,10 +636,32 @@ local function ShowScreenCover()
     performanceState.screenCover = gui
 
     task.spawn(function()
+        if not backgroundImage.Image or backgroundImage.Image == "" then return end
+        pcall(function()
+            ContentProvider:PreloadAsync({backgroundImage})
+        end)
+        task.wait(1.25)
+        local loaded = false
+        pcall(function()
+            loaded = backgroundImage.IsLoaded
+        end)
+        if not loaded and backgroundImage and backgroundImage.Parent then
+            local fallbackImage = GetAssetThumbnailId(backgroundImage.Image)
+            if fallbackImage ~= "" and fallbackImage ~= backgroundImage.Image then
+                backgroundImage.Image = fallbackImage
+                pcall(function()
+                    ContentProvider:PreloadAsync({backgroundImage})
+                end)
+            end
+        end
+    end)
+
+    task.spawn(function()
         while performanceState.screenCover == gui and gui.Parent do
             statusLabel.Text = "STATUS: " .. GetLagSaverStatusText()
             macroLabel.Text = "MACRO: " .. tostring(_G.SelectedFile or "None") .. "   |   CASINO: " .. tostring(_G.CasinoSelectedFile or "None")
             waveLabel.Text = "WAVE: " .. tostring(_G._CurrentWave or 0) .. "   |   FPS CAP: " .. tostring(_G.LowPerformanceFPS or 15)
+            cullingLabel.Text = "CULLING POINTS: " .. GetCullingPointsText()
             dashboardLabel.Text = GetLagSaverDashboardText()
             resultLabel.Text = GetLagSaverResultText()
             task.wait(1)
@@ -668,6 +800,7 @@ local function SaveConfig()
             AutoReplay = _G.AutoReplay,
             AutoSkip = _G.AutoSkip,
             AutoPlay = autoPlayVal,
+            AutoUpgrade = _G.AutoUpgrade,
             SelectedFile = _G.SelectedFile,
             DiscordURL = _G.DiscordURL,
             AutoJoinCasino = _G.AutoJoinCasino,
@@ -717,6 +850,7 @@ local function LoadConfig()
             _G.AutoReplay = data.AutoReplay or false
             _G.AutoSkip = data.AutoSkip or false
             _G.AutoPlay = data.AutoPlay or false
+            _G.AutoUpgrade = data.AutoUpgrade or false
             _G.SelectedFile = data.SelectedFile or "None"
             _G.DiscordURL = data.DiscordURL or ""
             _G.AutoJoinCasino = data.AutoJoinCasino or false

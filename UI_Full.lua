@@ -315,6 +315,28 @@ local function installCyberFrameEffects(MainFrame, MainStroke)
     end
 end
 
+local function installMobileScale(MainFrame)
+    if not UserInputService.TouchEnabled then return end
+    local scale = Instance.new("UIScale", MainFrame)
+    scale.Name = "MobileUIScale"
+
+    local function updateScale()
+        local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
+        local fitScale = math.min((viewport.X - 24) / 620, (viewport.Y - 24) / 380)
+        local target = math.min(fitScale * 0.96, 0.98)
+        if fitScale < 0.78 then
+            scale.Scale = math.max(target, math.min(fitScale, 0.58))
+        else
+            scale.Scale = math.clamp(target, 0.78, 0.98)
+        end
+    end
+
+    updateScale()
+    pcall(function()
+        workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale)
+    end)
+end
+
 -- ═══════════════════════════════════════════════════════
 -- 🖥️ MAIN UI CREATION (Full: all tabs)
 -- ═══════════════════════════════════════════════════════
@@ -447,12 +469,14 @@ local function LoadMainUI()
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
     MainFrame.Size = UDim2.new(0, 620, 0, 380)
-    MainFrame.Position = UDim2.new(0.5, -310, 0.5, -190)
+    MainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    MainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     MainFrame.BackgroundColor3 = Colors.Black
     MainFrame.BorderSizePixel = 0
     MainFrame.Visible = false 
     MainFrame.ZIndex = 1
     MainFrame.Parent = ScreenGui
+    installMobileScale(MainFrame)
 
     local MainCorner = Instance.new("UICorner", MainFrame)
     MainCorner.CornerRadius = UDim.new(0, 12)
@@ -597,6 +621,7 @@ local function LoadMainUI()
     PageLayout.EasingDirection = Enum.EasingDirection.Out
     PageLayout.TweenTime = 0.4
     PageLayout.ScrollWheelInputEnabled = false
+    local scrollEndPadding = UserInputService.TouchEnabled and 230 or 48
 
     -- Helper Functions
     local function createPage(name)
@@ -609,8 +634,10 @@ local function LoadMainUI()
         p.ScrollBarImageColor3 = Colors.NeonRed
         p.ZIndex = 3
         p.ClipsDescendants = true
+        p.Active = true
         p.ScrollingEnabled = true
         p.ScrollingDirection = Enum.ScrollingDirection.Y
+        p.AutomaticCanvasSize = Enum.AutomaticSize.None
         local layout = Instance.new("UIListLayout", p)
         layout.Padding = UDim.new(0, 10)
         layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
@@ -618,8 +645,20 @@ local function LoadMainUI()
         local pad = Instance.new("UIPadding", p)
         pad.PaddingTop = UDim.new(0, 10)
         pad.PaddingBottom = UDim.new(0, 10)
-        layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            p.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+        local function updateCanvasSize()
+            if not p.Parent then return end
+            p.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + pad.PaddingTop.Offset + pad.PaddingBottom.Offset + scrollEndPadding)
+        end
+        layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvasSize)
+        p:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateCanvasSize)
+        task.defer(updateCanvasSize)
+        task.delay(1, updateCanvasSize)
+        p.DescendantAdded:Connect(function(descendant)
+            if descendant:IsA("GuiObject") then
+                descendant:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateCanvasSize)
+                descendant:GetPropertyChangedSignal("Visible"):Connect(updateCanvasSize)
+                task.defer(updateCanvasSize)
+            end
         end)
         return p
     end
@@ -658,6 +697,27 @@ local function LoadMainUI()
         local pad = Instance.new("UIPadding", c)
         pad.PaddingTop = UDim.new(0, 8)
         pad.PaddingBottom = UDim.new(0, 8)
+        local minHeight = height or 0
+        local function updateContainerHeight()
+            if not c.Parent or not c.Visible then return end
+            local contentHeight = layout.AbsoluteContentSize.Y + pad.PaddingTop.Offset + pad.PaddingBottom.Offset + 4
+            local targetHeight = math.max(minHeight, contentHeight)
+            if c.Size.Y.Offset > 0 and math.abs(c.Size.Y.Offset - targetHeight) > 1 then
+                c.Size = UDim2.new(c.Size.X.Scale, c.Size.X.Offset, 0, targetHeight)
+            end
+        end
+        layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateContainerHeight)
+        c:GetPropertyChangedSignal("Visible"):Connect(function()
+            task.defer(updateContainerHeight)
+        end)
+        c.DescendantAdded:Connect(function(descendant)
+            if descendant:IsA("GuiObject") then
+                descendant:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateContainerHeight)
+                descendant:GetPropertyChangedSignal("Visible"):Connect(updateContainerHeight)
+                task.defer(updateContainerHeight)
+            end
+        end)
+        task.defer(updateContainerHeight)
         return c
     end
 
@@ -1462,6 +1522,14 @@ local function LoadMainUI()
             _G.MacroRunning = false
         else
             RunMacroLogic()
+        end
+        SaveConfig()
+    end)
+
+    _G.SetAutoUpgradeToggle = createToggle(MainBox, "autoอัพเกรต", _G.AutoUpgrade, function(v)
+        _G.AutoUpgrade = v
+        if v and _G.StartAutoUpgradeForTowers then
+            _G.StartAutoUpgradeForTowers(_G._AutoUpgradeMacroTowers, "Manual")
         end
         SaveConfig()
     end)
@@ -2476,13 +2544,73 @@ local function LoadMainUI()
     local OrbPriority = {}
     local _AutoBuyOrb = false
     local orbPriorityFile = FOLDER .. "/orb_priority.json"
+    local OrbRewardList = {"Cursed Scroll", "Cursed Crystals", "Gems", "Coins", "Unique Fragment"}
+    local OrbRewardAliases = {
+        cursedscroll = "Cursed Scroll",
+        cursedcrystal = "Cursed Crystals",
+        cursedcrystals = "Cursed Crystals",
+        gem = "Gems",
+        gems = "Gems",
+        coin = "Coins",
+        coins = "Coins",
+        uniquefragment = "Unique Fragment",
+        uniquefragments = "Unique Fragment",
+    }
+    local OrbRewardLookup = {}
+    for _, rewardName in ipairs(OrbRewardList) do
+        OrbRewardLookup[rewardName] = true
+    end
+    local function cleanOrbKey(text)
+        return tostring(text or ""):lower():gsub("[^%w]", "")
+    end
+    local function canonicalOrbName(text)
+        local raw = tostring(text or "")
+        if raw == "" then return "" end
+        return OrbRewardAliases[cleanOrbKey(raw)] or raw
+    end
+    local function findKnownOrbReward(text)
+        local key = cleanOrbKey(text)
+        if key == "" then return "" end
+        if OrbRewardAliases[key] then return OrbRewardAliases[key] end
+        for aliasKey, rewardName in pairs(OrbRewardAliases) do
+            if key == aliasKey or key:find(aliasKey, 1, true) or aliasKey:find(key, 1, true) then
+                return rewardName
+            end
+        end
+        for _, rewardName in ipairs(OrbRewardList) do
+            local rewardKey = cleanOrbKey(rewardName)
+            if key == rewardKey or key:find(rewardKey, 1, true) or rewardKey:find(key, 1, true) then
+                return rewardName
+            end
+        end
+        return ""
+    end
+    local function NormalizeOrbPriority()
+        local normalized = {}
+        local seen = {}
+        for _, rewardName in ipairs(OrbPriority) do
+            local canonical = canonicalOrbName(rewardName)
+            if OrbRewardLookup[canonical] and not seen[canonical] then
+                table.insert(normalized, canonical)
+                seen[canonical] = true
+            end
+        end
+        for _, rewardName in ipairs(OrbRewardList) do
+            if not seen[rewardName] then
+                table.insert(normalized, rewardName)
+                seen[rewardName] = true
+            end
+        end
+        OrbPriority = normalized
+    end
     pcall(function()
         if isfile(orbPriorityFile) then OrbPriority = HttpService:JSONDecode(readfile(orbPriorityFile)) end
     end)
-    if #OrbPriority == 0 then OrbPriority = {"Cursed Scroll", "Cursed Crystals", "Gems", "Coins"} end
+    NormalizeOrbPriority()
     local function SaveOrbPri()
         pcall(function() writefile(orbPriorityFile, HttpService:JSONEncode(OrbPriority)) end)
     end
+    SaveOrbPri()
 
     local orbStatus = Instance.new("TextLabel", OrbBox)
     orbStatus.Text = "ตั้งลำดับรางวัล → เปิด Auto"
@@ -2513,7 +2641,7 @@ local function LoadMainUI()
             end
         end
     end
-    for i = 1, 4 do
+    for i = 1, #OrbRewardList do
         local row = Instance.new("TextButton", OrbBox)
         row.Size = UDim2.new(1, -25, 0, 28)
         row.BackgroundColor3 = Colors.DarkGray
@@ -2554,21 +2682,102 @@ local function LoadMainUI()
     Instance.new("UICorner", orbToggle).CornerRadius = UDim.new(0, 8)
 
     local orbBuyCount = 0
-    local function forceClickBtn(btn)
+    local function activateOrbButton(btn)
+        local activated = false
         if type(firesignal) == "function" then
-            pcall(function() firesignal(btn.MouseButton1Click) end)
-            pcall(function() firesignal(btn.Activated) end)
-            pcall(function() firesignal(btn.TouchTap) end)
-            pcall(function() firesignal(btn.MouseButton1Up) end)
+            activated = pcall(function() firesignal(btn.MouseButton1Click) end) or activated
+            activated = pcall(function() firesignal(btn.Activated) end) or activated
+            activated = pcall(function() firesignal(btn.MouseButton1Up) end) or activated
         end
-        pcall(function() game:GetService("VirtualUser"):ClickButton(btn) end)
-        pcall(function()
-            local VIM = game:GetService("VirtualInputManager")
-            local pos = btn.AbsolutePosition + btn.AbsoluteSize / 2
-            VIM:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 1)
-            task.wait(0.1)
-            VIM:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 1)
-        end)
+        activated = pcall(function() btn:Activate() end) or activated
+        return activated
+    end
+    local function getOrbCardReward(card)
+        if not card then return "" end
+        local function scanValue(obj, allowName)
+            if not obj then return "" end
+
+            if allowName then
+                local byName = findKnownOrbReward(obj.Name)
+                if byName ~= "" then return byName end
+            end
+
+            local okValue, value = pcall(function() return obj.Value end)
+            if okValue and value ~= nil then
+                local byValue = findKnownOrbReward(value)
+                if byValue ~= "" then return byValue end
+            end
+
+            local okText, text = pcall(function() return obj.Text end)
+            if okText and text ~= nil then
+                local byText = findKnownOrbReward(text)
+                if byText ~= "" then return byText end
+            end
+
+            return ""
+        end
+
+        local btn = card:FindFirstChild("Btn")
+        local title = btn and btn:FindFirstChild("Title")
+        local rewardName = scanValue(title, false)
+        if rewardName ~= "" then return rewardName end
+
+        local transVal = card:FindFirstChild("TransVal")
+        rewardName = scanValue(transVal, true)
+        if rewardName ~= "" then return rewardName end
+
+        if transVal then
+            for _, obj in ipairs(transVal:GetDescendants()) do
+                rewardName = scanValue(obj, true)
+                if rewardName ~= "" then return rewardName end
+            end
+        end
+
+        for _, obj in ipairs(card:GetDescendants()) do
+            rewardName = scanValue(obj, false)
+            if rewardName ~= "" then return rewardName end
+        end
+
+        return ""
+    end
+    local function selectFirstAvailableOrbCard(orbsFrame)
+        for ci = 1, 3 do
+            local card = orbsFrame:FindFirstChild(tostring(ci))
+            if card and card:FindFirstChild("Btn") then
+                if activateOrbButton(card.Btn) then
+                    return ci
+                end
+            end
+        end
+        return 0
+    end
+    local function orbRewardMatches(cardReward, wantedReward)
+        local cardKey = cleanOrbKey(canonicalOrbName(cardReward))
+        local wantedKey = cleanOrbKey(canonicalOrbName(wantedReward))
+        return cardKey ~= "" and wantedKey ~= "" and (cardKey == wantedKey or cardKey:find(wantedKey, 1, true) or wantedKey:find(cardKey, 1, true))
+    end
+    local function waitOrbRewards(orbsFrame)
+        local cardRewards = {}
+        local deadline = os.clock() + 1
+        repeat
+            local readyCount = 0
+            for ci = 1, 3 do
+                local card = orbsFrame:FindFirstChild(tostring(ci))
+                local rewardName = getOrbCardReward(card)
+                cardRewards[ci] = rewardName
+                if rewardName ~= "" then readyCount = readyCount + 1 end
+            end
+            if readyCount >= 3 or os.clock() >= deadline then break end
+            task.wait(0.03)
+        until not _AutoBuyOrb
+        return cardRewards
+    end
+    local function formatOrbRewards(cardRewards)
+        local parts = {}
+        for ci = 1, 3 do
+            parts[ci] = "#" .. ci .. "=" .. ((cardRewards and cardRewards[ci] ~= "" and cardRewards[ci]) or "?")
+        end
+        return table.concat(parts, ", ")
     end
 
     orbToggle.MouseButton1Click:Connect(function()
@@ -2597,7 +2806,7 @@ local function LoadMainUI()
 
                         -- รอหน้าเลือกรางวัลเด้งขึ้นมา
                         local orbsFrame = nil
-                        for waitI = 1, 50 do
+                        for waitI = 1, 150 do
                             if not _AutoBuyOrb then break end
                             pcall(function()
                                 local orbsUI = Player.PlayerGui:FindFirstChild("Orbs")
@@ -2607,39 +2816,40 @@ local function LoadMainUI()
                                 end
                             end)
                             if orbsFrame then break end
-                            task.wait(0.15)
+                            task.wait(0.05)
                         end
                         if not _AutoBuyOrb then break end
 
                         if orbsFrame then
-                            task.wait(0.5) -- รออนิเมชั่น
+                            local cardRewards = waitOrbRewards(orbsFrame)
 
                             -- เลือกรางวัลตาม priority
                             local selected = false
                             for _, wantedItem in ipairs(OrbPriority) do
                                 if selected then break end
                                 for ci = 1, 3 do
+                                    if selected then break end
                                     pcall(function()
                                         local card = orbsFrame:FindFirstChild(tostring(ci))
-                                        if card and card:FindFirstChild("Btn") then
-                                            local title = card.Btn:FindFirstChild("Title")
-                                            if title and title.Text == wantedItem then
-                                                forceClickBtn(card.Btn)
-                                                orbStatus.Text = "✅ รอบ " .. round .. "/10 → " .. wantedItem
-                                                orbStatus.TextColor3 = Colors.Green
-                                                print("🔮 รอบ " .. round .. "/10 → " .. wantedItem)
-                                                selected = true
-                                            end
+                                        local rewardName = cardRewards[ci] or getOrbCardReward(card)
+                                        if card and card:FindFirstChild("Btn") and orbRewardMatches(rewardName, wantedItem) then
+                                            activateOrbButton(card.Btn)
+                                            orbStatus.Text = "✅ รอบ " .. round .. "/10 → " .. wantedItem
+                                            orbStatus.TextColor3 = Colors.Green
+                                            print("🔮 รอบ " .. round .. "/10 → " .. wantedItem .. " (#" .. ci .. ")")
+                                            selected = true
                                         end
                                     end)
                                 end
                             end
                             if not selected then
                                 pcall(function()
-                                    local c1 = orbsFrame:FindFirstChild("1")
-                                    if c1 and c1:FindFirstChild("Btn") then forceClickBtn(c1.Btn) end
+                                    local fallbackIndex = selectFirstAvailableOrbCard(orbsFrame)
+                                    if fallbackIndex > 0 then
+                                        orbStatus.Text = "⚠️ รอบ " .. round .. "/10 ไม่พบในลำดับ → กดใบ " .. fallbackIndex
+                                        print("🔮 รอบ " .. round .. "/10 ไม่พบ priority (" .. formatOrbRewards(cardRewards) .. ") → กดใบ " .. fallbackIndex)
+                                    end
                                 end)
-                                orbStatus.Text = "⚠️ รอบ " .. round .. "/10 กดใบ 1"
                             end
                             pickCount = pickCount + 1
 
@@ -2655,9 +2865,9 @@ local function LoadMainUI()
                                     end
                                 end)
                                 if not stillOpen then break end
-                                task.wait(0.15)
+                                task.wait(0.05)
                             end
-                            task.wait(0.3)
+                            task.wait(0.08)
                         else
                             -- หน้าเลือกไม่ขึ้น = หมดรางวัลแล้ว
                             orbStatus.Text = "📦 เลือกครบ " .. pickCount .. "/10 รอบ"
