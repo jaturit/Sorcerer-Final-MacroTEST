@@ -2206,6 +2206,8 @@ pcall(function()
                     if idx then
                         local moneyBefore = Player.leaderstats.Money.Value
                         local result = old(self, ...)
+                        _G._RecordPendingOps = (_G._RecordPendingOps or 0) + 1
+                        task.spawn(function()
                         local waited = 0
                         repeat task.wait(0.05) waited = waited + 0.05
                         until Player.leaderstats.Money.Value ~= moneyBefore or waited >= 2
@@ -2226,10 +2228,14 @@ pcall(function()
                                     if not result then result = args[1] end
                                 end)
                             end
-                            table.insert(CurrentData, {Type = "Upgrade", Index = idx, Price = realCost})
-                            if result then PlacedTowers[idx] = result end
+                            if type(CurrentData) == "table" then
+                                table.insert(CurrentData, {Type = "Upgrade", Index = idx, Price = realCost})
+                            end
+                            if result and type(PlacedTowers) == "table" then PlacedTowers[idx] = result end
                             print("✅ Recorded Upgrade | Cost: " .. realCost)
                         end
+                        _G._RecordPendingOps = math.max((_G._RecordPendingOps or 1) - 1, 0)
+                        end)
                         return result
                     end
                 elseif self.Name == "SellTower" then
@@ -4838,10 +4844,95 @@ local function RunMacroLogic()
     
     -- 🔥 สำคัญ: GameTowers เก็บเฉพาะ Tower ที่วางสำเร็จจริงๆ เท่านั้น
     local GameTowers = {}
+    local GameTowerPivots = {}
     _G._AutoUpgradeMacroTowers = GameTowers
     _G._AutoUpgradeSource = "Macro"
     -- index ที่ถูก Sell ไปแล้ว รอให้ Spawn ครั้งถัดไปนำมาใช้ซ้ำ
     local recycledIndexes = {}
+
+    local function IsMacroTowerValid(tower)
+        local valid = false
+        pcall(function()
+            valid = tower and typeof(tower) == "Instance" and tower.Parent ~= nil
+        end)
+        return valid
+    end
+
+    local function CaptureTowerPivot(tower)
+        local pivot = nil
+        pcall(function()
+            if tower and typeof(tower) == "Instance" then
+                pivot = tower:GetPivot()
+            end
+        end)
+        return pivot
+    end
+
+    local function RememberGameTower(index, tower)
+        GameTowers[index] = tower
+        local pivot = CaptureTowerPivot(tower)
+        if pivot then
+            GameTowerPivots[index] = pivot
+        end
+    end
+
+    local function SnapshotWorkspaceTowers()
+        local snapshot = {}
+        pcall(function()
+            local towers = workspace:FindFirstChild("Towers")
+            if towers then
+                for _, tower in ipairs(towers:GetChildren()) do
+                    snapshot[tower] = true
+                end
+            end
+        end)
+        return snapshot
+    end
+
+    local function FindReplacementTower(oldTower, oldPivot, beforeSnapshot)
+        if not oldPivot then return nil end
+
+        local fallback = nil
+        local fallbackDist = 8
+        local best = nil
+        local bestDist = 8
+
+        pcall(function()
+            local towers = workspace:FindFirstChild("Towers")
+            if not towers then return end
+
+            for _, tower in ipairs(towers:GetChildren()) do
+                if tower ~= oldTower and IsMacroTowerValid(tower) then
+                    local dist = (tower:GetPivot().Position - oldPivot.Position).Magnitude
+                    if dist < fallbackDist then
+                        fallback = tower
+                        fallbackDist = dist
+                    end
+                    if (not beforeSnapshot or not beforeSnapshot[tower]) and dist < bestDist then
+                        best = tower
+                        bestDist = dist
+                    end
+                end
+            end
+        end)
+
+        return best or fallback
+    end
+
+    local function RecoverGameTower(index, oldTower, beforeSnapshot, oldPivot)
+        local replacement = FindReplacementTower(oldTower, oldPivot or GameTowerPivots[index], beforeSnapshot)
+        if replacement then
+            RememberGameTower(index, replacement)
+            return replacement
+        end
+
+        if IsMacroTowerValid(oldTower) then
+            RememberGameTower(index, oldTower)
+            return oldTower
+        end
+
+        return nil
+    end
     
     print("▶️ Starting Macro: ".._G.SelectedFile)
     print("📊 Total actions: " .. #data)
@@ -5079,7 +5170,7 @@ local function RunMacroLogic()
                             spawnIndex = spawnIndex + 1
                             usedIndex = spawnIndex
                         end
-                        GameTowers[usedIndex] = unit
+                        RememberGameTower(usedIndex, unit)
                         success = true
                         print("✅ [" .. i .. "/" .. #data .. "] Spawn SUCCESS! Tower #" .. usedIndex .. " [" .. tostring(towerName) .. "] | เหลือ: " .. moneyAfter .. "$")
                     elseif isErrorResponse then
@@ -5087,6 +5178,7 @@ local function RunMacroLogic()
                         -- Upgrade ที่ผูกกับ index นี้จะ skip ไปเองเพราะหา unit ไม่เจอ
                         spawnIndex = spawnIndex + 1
                         GameTowers[spawnIndex] = nil
+                        GameTowerPivots[spawnIndex] = nil
                         success = true
                         print("⚠️ [" .. i .. "/" .. #data .. "] Spawn ถึง limit - SKIP | Tower #" .. spawnIndex .. " = nil (Upgrade ที่ผูกกับตัวนี้จะถูก skip ด้วย)")
                     elseif spawnError then
@@ -5098,6 +5190,7 @@ local function RunMacroLogic()
                         if attemptCount >= 3 then
                             spawnIndex = spawnIndex + 1
                             GameTowers[spawnIndex] = nil
+                            GameTowerPivots[spawnIndex] = nil
                             success = true
                             print("⚠️ [" .. i .. "/" .. #data .. "] Spawn FAILED " .. attemptCount .. " ครั้ง เงินพอแต่วางไม่ได้ = ถึง limit → SKIP | Tower #" .. spawnIndex .. " = nil")
                         else
@@ -5128,9 +5221,22 @@ local function RunMacroLogic()
                     end
 
                     if not isUnitValid then
-                        print("⚠️ [" .. i .. "/" .. #data .. "] Tower #" .. act.Index .. " invalid - Retry in " .. RETRY_DELAY .. "s...")
-                        task.wait(RETRY_DELAY)
-                        continue
+                        local recovered = RecoverGameTower(act.Index, unit, nil, GameTowerPivots[act.Index])
+                        if recovered then
+                            unit = recovered
+                            isUnitValid = true
+                            print("🔄 [" .. i .. "/" .. #data .. "] Recovered Tower #" .. act.Index .. " → " .. tostring(unit.Name))
+                        elseif attemptCount >= MAX_ATTEMPTS then
+                            print("⚠️ [" .. i .. "/" .. #data .. "] Tower #" .. act.Index .. " invalid too long - SKIP Upgrade to avoid stuck loop")
+                            GameTowers[act.Index] = nil
+                            GameTowerPivots[act.Index] = nil
+                            success = true
+                            break
+                        else
+                            print("⚠️ [" .. i .. "/" .. #data .. "] Tower #" .. act.Index .. " invalid - Retry in " .. RETRY_DELAY .. "s...")
+                            task.wait(RETRY_DELAY)
+                            continue
+                        end
                     end
 
                     -- 💰 รอเงินให้ครบ act.Price ก่อน invoke เลย
@@ -5149,6 +5255,8 @@ local function RunMacroLogic()
                     local moneyBefore = Player.leaderstats.Money.Value
                     print("⬆️ [" .. i .. "/" .. #data .. "] Upgrade Tower #" .. act.Index .. " | เงิน: " .. moneyBefore .. "$ / ต้องการ: " .. requiredMoney .. "$ (Attempt #" .. attemptCount .. ")")
 
+                    local oldPivot = CaptureTowerPivot(unit)
+                    local towersBefore = SnapshotWorkspaceTowers()
                     local newUnit = nil
                     pcall(function() newUnit = Functions.UpgradeTower:InvokeServer(unit) end)
 
@@ -5167,17 +5275,30 @@ local function RunMacroLogic()
 
                     if isNewUnitValid then
                         -- ✅ อัพสำเร็จ: เช็คจาก newUnit โผล่ใน workspace จริงๆ
-                        GameTowers[act.Index] = newUnit
+                        RememberGameTower(act.Index, newUnit)
                         success = true
                         print("✅ [" .. i .. "/" .. #data .. "] Upgrade SUCCESS! Tower #" .. act.Index .. " | เหลือ: " .. moneyAfter .. "$")
                     elseif moneySpent > 0 and not isNewUnitValid then
-                        -- unit เดิมยังอยู่ แค่ไม่ได้ return newUnit มา
-                        success = true
-                        print("✅ [" .. i .. "/" .. #data .. "] Upgrade SUCCESS (same unit)! Tower #" .. act.Index .. " | เหลือ: " .. moneyAfter .. "$")
+                        local recovered = RecoverGameTower(act.Index, unit, towersBefore, oldPivot)
+                        if recovered then
+                            success = true
+                            print("✅ [" .. i .. "/" .. #data .. "] Upgrade SUCCESS (recovered)! Tower #" .. act.Index .. " → " .. tostring(recovered.Name) .. " | เหลือ: " .. moneyAfter .. "$")
+                        else
+                            GameTowers[act.Index] = nil
+                            GameTowerPivots[act.Index] = nil
+                            success = true
+                            print("⚠️ [" .. i .. "/" .. #data .. "] Upgrade took money but tower replacement not found - SKIP later upgrades for #" .. act.Index)
+                        end
                     else
                         -- ❌ เงินไม่หาย = เงินไม่พอ หรืออัพไม่ได้ → รอแล้วลองใหม่
-                        print("❌ Upgrade FAILED - เงินไม่หาย (มีอยู่: " .. moneyAfter .. "$) → รอ " .. RETRY_DELAY .. "s แล้วลองใหม่ [" .. attemptCount .. "/" .. MAX_ATTEMPTS .. "]")
-                        task.wait(RETRY_DELAY)
+                        if attemptCount >= MAX_ATTEMPTS then
+                            print("⚠️ Upgrade FAILED too many times - SKIP Tower #" .. act.Index .. " to avoid stuck loop")
+                            success = true
+                            break
+                        else
+                            print("❌ Upgrade FAILED - เงินไม่หาย (มีอยู่: " .. moneyAfter .. "$) → รอ " .. RETRY_DELAY .. "s แล้วลองใหม่ [" .. attemptCount .. "/" .. MAX_ATTEMPTS .. "]")
+                            task.wait(RETRY_DELAY)
+                        end
                     end
 
                 -- ============ SELL ============
@@ -5222,6 +5343,7 @@ local function RunMacroLogic()
 
                     if moneyGained > 0 then
                         GameTowers[act.Index] = nil
+                        GameTowerPivots[act.Index] = nil
                         table.insert(recycledIndexes, act.Index) -- เก็บ index ไว้ให้ Spawn ถัดไปใช้
                         success = true
                         print("✅ [" .. i .. "/" .. #data .. "] Sell SUCCESS! Tower #" .. act.Index .. " | ได้คืน: " .. moneyGained .. "$ | เหลือ: " .. moneyAfter .. "$ (index " .. act.Index .. " พร้อมใช้ซ้ำ)")
@@ -8184,10 +8306,16 @@ local function LoadMainUI()
         if IsRecording then
             CurrentData = {}
             PlacedTowers = {}
+            _G._RecordPendingOps = 0
             _G._CurrentData = CurrentData
             _G._PlacedTowers = PlacedTowers
             print("🔴 Recording Started...")
         else
+            local waitPending = 0
+            while (_G._RecordPendingOps or 0) > 0 and waitPending < 3 do
+                task.wait(0.05)
+                waitPending = waitPending + 0.05
+            end
             if _G.SelectedFile ~= "None" then
                 -- บันทึก macro พร้อมชื่อ map ลงไปด้วย
                 local mapName = GetCurrentMapName()
