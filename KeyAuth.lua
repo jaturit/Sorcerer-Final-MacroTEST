@@ -4,7 +4,6 @@
 local HttpService = _G._Services.HttpService
 local Players = game:GetService("Players")
 local Player = _G._Player or Players.LocalPlayer
-local Request = _G._Request or request or http_request or (syn and syn.request)
 local AUTH_FILE = _G._AUTH_FILE or "MacroProAuth.json"
 
 local KeySystem = {
@@ -33,7 +32,7 @@ function KeySystem:IsConfigured()
         and self.WebAppURL:match("/exec/?$") ~= nil
 end
 
-function KeySystem:Post(action, data)
+function KeySystem:CallAPI(action, data)
     if not self:IsConfigured() then
         return {
             ok = false,
@@ -42,54 +41,35 @@ function KeySystem:Post(action, data)
         }
     end
 
-    if type(Request) ~= "function" then
-        return {
-            ok = false,
-            code = "REQUEST_UNAVAILABLE",
-            msg = "โปรแกรมนี้ไม่รองรับการเชื่อมต่อระบบคีย์"
-        }
-    end
-
     data = data or {}
     data.action = action
 
-    local success, response = pcall(function()
-        return Request({
-            Url = self.WebAppURL,
-            Method = "POST",
-            Headers = {
-                ["Content-Type"] = "application/json"
-            },
-            Body = HttpService:JSONEncode(data)
-        })
+    local queryParts = {}
+    for name, value in pairs(data) do
+        table.insert(queryParts,
+            HttpService:UrlEncode(tostring(name)) .. "=" ..
+            HttpService:UrlEncode(tostring(value))
+        )
+    end
+    table.insert(queryParts, "t=" .. tostring(os.time()))
+
+    local separator = self.WebAppURL:find("?", 1, true) and "&" or "?"
+    local requestUrl = self.WebAppURL .. separator .. table.concat(queryParts, "&")
+
+    -- ใช้ GET/game:HttpGet เพื่อรองรับ Executor ที่ตอบ HTTP 405 เมื่อส่ง POST
+    local success, responseBody = pcall(function()
+        return game:HttpGet(requestUrl, true)
     end)
 
     if not success then
         return {
             ok = false,
             code = "NETWORK_ERROR",
-            msg = "เชื่อมต่อระบบคีย์ไม่สำเร็จ: " .. tostring(response)
+            msg = "เชื่อมต่อระบบคีย์ไม่สำเร็จ: " .. tostring(responseBody)
         }
     end
 
-    local statusCode = 200
-    local body = ""
-    if type(response) == "table" then
-        statusCode = tonumber(response.StatusCode or response.Status or 200) or 200
-        body = tostring(response.Body or response.body or "")
-    else
-        body = tostring(response or "")
-    end
-
-    if statusCode < 200 or statusCode >= 300 then
-        return {
-            ok = false,
-            code = "HTTP_ERROR",
-            msg = "ระบบคีย์ตอบกลับ HTTP " .. tostring(statusCode)
-        }
-    end
-
-    local result = decodeResponse(body)
+    local result = decodeResponse(tostring(responseBody or ""))
     if not result then
         return {
             ok = false,
@@ -107,7 +87,7 @@ function KeySystem:ValidateKey(key)
         return false, "กรุณาใส่คีย์", 0, nil
     end
 
-    local result = self:Post("validate", {
+    local result = self:CallAPI("validate", {
         key = key,
         deviceId = tostring(Player.UserId),
         deviceName = Player.Name
