@@ -10,7 +10,7 @@ local AUTH_FILE = _G._AUTH_FILE or "MacroProAuth.json"
 local KeySystem = {
     -- ใส่ URL หลัง Deploy Google Apps Script เป็น Web App เช่น:
     -- https://script.google.com/macros/s/DEPLOYMENT_ID/exec
-    WebAppURL = _G._KEY_API_URL or "PASTE_YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE"
+    WebAppURL = _G._KEY_API_URL or "https://script.google.com/macros/s/AKfycbwR-zm1_bdvMwMtR4dqDF8SCu19m3gI-aG333CjP8oc8Pqy2sCKiXaffm9FhGhvukgBmQ/exec"
 }
 
 local function normalizeKey(key)
