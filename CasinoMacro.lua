@@ -529,7 +529,7 @@ end
 -- 📊 DASHBOARD CACHE
 -- ═══════════════════════════════════════════════════════
 
-local DASH_FILE = FOLDER.."/dashboard.json"
+local DASH_FILE = _G._DASHBOARD_FILE or (FOLDER.."/dashboard.json")
 
 local function SaveDashboardCache()
     -- Load existing cache first so we don't overwrite good data with nil

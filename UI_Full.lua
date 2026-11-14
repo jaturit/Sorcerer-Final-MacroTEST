@@ -390,7 +390,7 @@ local function LoadMainUI()
             -- 2. ถ้าในหน้าจอหาไม่เจอ ค่อยอ่านเลข Colony จากไฟล์ที่เซฟไว้ตอนเข้าจาก Lobby
             if colony == 0 then
                 pcall(function() 
-                    local filePath = FOLDER .. "/event_colony.txt"
+                    local filePath = (_G._EVENT_COLONY_FILE or (FOLDER .. "/event_colony.txt"))
                     if isfile(filePath) then 
                         colony = tonumber(readfile(filePath)) or 0 
                     end 
@@ -1922,19 +1922,128 @@ local function LoadMainUI()
     h4.TextXAlignment = Enum.TextXAlignment.Left
     h4.ZIndex = 4
 
+    do -- ⚠️ ครอบ scope ไว้: LoadMainUI ใช้ local เกือบเต็มลิมิต 200 ของ Luau แล้ว
     local AutoJoinBox = createContainer(Page4, 200)
-    createToggle(AutoJoinBox, "🎰 Auto Join Casino", _G.AutoJoinCasino, function(v)
+    local setAutoJoinCasino = createToggle(AutoJoinBox, "🎰 Auto Join Casino", _G.AutoJoinCasino, function(v)
         _G.AutoJoinCasino = v; SaveConfig()
     end)
-    createToggle(AutoJoinBox, "⚔️ Auto Join Raid (Meguna)", _G.AutoJoinRaid, function(v)
+    local setAutoJoinRaid = createToggle(AutoJoinBox, "⚔️ Auto Join Raid (Meguna)", _G.AutoJoinRaid, function(v)
         _G.AutoJoinRaid = v; SaveConfig()
     end)
-    createToggle(AutoJoinBox, "⚡ Auto Join Raid (GOJO)", _G.AutoJoinRaidGojo, function(v)
+    local setAutoJoinRaidGojo = createToggle(AutoJoinBox, "⚡ Auto Join Raid (GOJO)", _G.AutoJoinRaidGojo, function(v)
         _G.AutoJoinRaidGojo = v; SaveConfig()
     end)
-    createToggle(AutoJoinBox, "🌀 Auto Join GAUNTLET", _G.AutoJoinGauntlet, function(v)
+    local setAutoJoinGauntlet = createToggle(AutoJoinBox, "🌀 Auto Join GAUNTLET", _G.AutoJoinGauntlet, function(v)
         _G.AutoJoinGauntlet = v; SaveConfig()
     end)
+
+    -- 👤 CONFIG PROFILE: แยกคอนฟิกตามไอดี (เปิดหลายจอด้วยตัวรันเดียวกันได้ ไม่ทับกัน)
+    local hProfile = Instance.new("TextLabel", Page4)
+    hProfile.Text = "💾 CONFIG PROFILE (แยกตามไอดี)"
+    hProfile.Size = UDim2.new(1, -20, 0, 30)
+    hProfile.BackgroundTransparency = 1
+    hProfile.TextColor3 = Colors.NeonRed
+    hProfile.Font = Enum.Font.GothamBold
+    hProfile.TextSize = 15
+    hProfile.TextXAlignment = Enum.TextXAlignment.Left
+    hProfile.ZIndex = 4
+
+    local ProfileBox = createContainer(Page4, 330)
+
+    local function makeProfileLabel(text, color, height)
+        local l = Instance.new("TextLabel", ProfileBox)
+        l.Size = UDim2.new(1, -20, 0, height or 20)
+        l.BackgroundTransparency = 1
+        l.Text = text
+        l.TextColor3 = color
+        l.Font = Enum.Font.GothamMedium
+        l.TextSize = 12
+        l.TextWrapped = true
+        l.TextXAlignment = Enum.TextXAlignment.Left
+        l.ZIndex = 5
+        return l
+    end
+
+    makeProfileLabel("👤 ไอดีนี้: " .. tostring(Player.Name) .. " (" .. tostring(_G._PROFILE_ID or Player.UserId) .. ")", Colors.White)
+    makeProfileLabel("📁 เซฟที่: " .. tostring(_G._PROFILE_FOLDER or "?") .. "/settings.json", Colors.LightGray, 32)
+    local profileStatus = makeProfileLabel("สถานะ: แต่ละจอเซฟแยกไฟล์ตามไอดีอัตโนมัติ", Colors.Green)
+
+    local function setProfileStatus(text, ok)
+        profileStatus.Text = "สถานะ: " .. tostring(text)
+        profileStatus.TextColor3 = ok and Colors.Green or Colors.Yellow
+    end
+
+    -- หลังโหลดคอนฟิก: อัปเดตปุ่มในหน้านี้ให้ตรงกับค่าใหม่
+    local function refreshMainToggles()
+        pcall(function() setAutoJoinCasino(_G.AutoJoinCasino and true or false) end)
+        pcall(function() setAutoJoinRaid(_G.AutoJoinRaid and true or false) end)
+        pcall(function() setAutoJoinRaidGojo(_G.AutoJoinRaidGojo and true or false) end)
+        pcall(function() setAutoJoinGauntlet(_G.AutoJoinGauntlet and true or false) end)
+    end
+
+    createButton(ProfileBox, "💾 Save Config (ไอดีนี้)", "บันทึกค่าปัจจุบันลงไฟล์ของไอดีนี้เท่านั้น", function()
+        SaveConfig()
+        pcall(function() if _G.SaveStoryTowers then _G.SaveStoryTowers() end end)
+        pcall(function() if _G.SaveMapMacros then _G.SaveMapMacros() end end)
+        setProfileStatus("บันทึกคอนฟิกของ " .. tostring(Player.Name) .. " แล้ว", true)
+    end)
+
+    createButton(ProfileBox, "📂 Load Config (ไอดีนี้)", "โหลดค่าที่เซฟไว้ของไอดีนี้ (จอนี้) กลับมาใช้", function()
+        local ok = pcall(function() _G.ReloadMyConfig() end)
+        refreshMainToggles()
+        setProfileStatus(ok and "โหลดคอนฟิกของไอดีนี้แล้ว (ปุ่มหน้าอื่นจะอัปเดตเมื่อรันสคริปต์ใหม่)" or "โหลดไม่สำเร็จ", ok)
+    end)
+
+    -- เลือกโปรไฟล์ไอดีอื่น (กดเพื่อวนเลือก) แล้วคัดลอกคอนฟิกมาใช้กับไอดีนี้
+    local profileList, profileIndex = {}, 0
+    local profilePicker = createInput(ProfileBox, "คัดลอกจากไอดี:", "กดปุ่มด้านล่างเพื่อวนเลือก", "", function() end)
+    profilePicker.TextEditable = false
+    profilePicker.ClearTextOnFocus = false
+
+    local function selectedProfile()
+        return profileList[profileIndex]
+    end
+
+    local function showSelectedProfile()
+        local p = selectedProfile()
+        if p then
+            profilePicker.Text = p.Name .. " (" .. p.Id .. ")" .. (p.IsMe and " • ไอดีนี้" or "")
+        else
+            profilePicker.Text = "ยังไม่มีโปรไฟล์"
+        end
+    end
+
+    createButton(ProfileBox, "🔁 เลือกโปรไฟล์ถัดไป", "วนดูโปรไฟล์ของทุกไอดีที่เคยรันบนเครื่องนี้", function()
+        local current = selectedProfile()
+        local currentId = current and current.Id
+        profileList = (_G.ListConfigProfiles and _G.ListConfigProfiles()) or {}
+        if #profileList == 0 then
+            profileIndex = 0
+        else
+            local idx = 0
+            for i, p in ipairs(profileList) do
+                if p.Id == currentId then idx = i; break end
+            end
+            profileIndex = (idx % #profileList) + 1
+        end
+        showSelectedProfile()
+    end)
+
+    createButton(ProfileBox, "📥 โหลดคอนฟิกจากโปรไฟล์ที่เลือก", "คัดลอกค่าของไอดีที่เลือกมาเป็นของไอดีนี้ (ไม่แตะไฟล์ของจออื่น)", function()
+        local p = selectedProfile()
+        if not p then
+            setProfileStatus("กด 'เลือกโปรไฟล์ถัดไป' ก่อน", false)
+            return
+        end
+        local ok, msg = false, "โหลดไม่สำเร็จ"
+        pcall(function() ok, msg = _G.LoadConfigFromProfile(p.Id) end)
+        refreshMainToggles()
+        if ok then
+            msg = msg .. " (ปุ่มหน้าอื่นจะอัปเดตเมื่อรันสคริปต์ใหม่)"
+        end
+        setProfileStatus(msg, ok)
+    end)
+    end -- do (Auto Join + Config Profile)
 
     -- RAID TICKET SECTION
     local raidTicketBought = 0
@@ -3157,7 +3266,7 @@ local function LoadMainUI()
     eventPointsLbl.ZIndex = 5
 
     -- โหลด Culling Points จากไฟล์ (ถ้ามี)
-    local cpFile = FOLDER .. "/culling_points.txt"
+    local cpFile = _G._CULLING_POINTS_FILE or (FOLDER .. "/culling_points.txt")
     pcall(function()
         if isfile(cpFile) then
             eventPointsLbl.Text = "🏆 Culling Points: " .. readfile(cpFile)
@@ -3557,7 +3666,7 @@ local function LoadMainUI()
         -- 4. อ่านจากไฟล์ที่เซฟตอนเข้าตู้ lobby (fallback สุดท้าย)
         if num == 0 then
             pcall(function()
-                local filePath = FOLDER .. "/event_colony.txt"
+                local filePath = (_G._EVENT_COLONY_FILE or (FOLDER .. "/event_colony.txt"))
                 if isfile(filePath) then
                     num = tonumber(readfile(filePath)) or 0
                 end
@@ -3786,7 +3895,7 @@ local function LoadMainUI()
                             end
                             if foundN then
                                 _G._CachedEventColony = foundN
-                                pcall(function() writefile(FOLDER .. "/event_colony.txt", tostring(foundN)) end)
+                                pcall(function() writefile((_G._EVENT_COLONY_FILE or (FOLDER .. "/event_colony.txt")), tostring(foundN)) end)
                                 print("💾 [Event] Colony " .. foundN .. " (จากตู้ " .. elevNum .. ")")
                             end
                         end

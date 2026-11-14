@@ -165,7 +165,7 @@ local function SendGameEndNotification()
                             end
                             
                             if updated and _G._FOLDER and _G._Services and _G._Services.HttpService then
-                                writefile(_G._FOLDER.."/dashboard.json", _G._Services.HttpService:JSONEncode(cached))
+                                writefile(_G._DASHBOARD_FILE or (_G._FOLDER.."/dashboard.json"), _G._Services.HttpService:JSONEncode(cached))
                             end
                         end)
                     end

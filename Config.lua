@@ -20,18 +20,61 @@ local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
 local FOLDER = "Sorcerer_Final_Macro"
 local CASINO_FOLDER = FOLDER.."/Casino_Macros"
-local AUTH_FILE = FOLDER.."/user_auth.json"
-local CONFIG_FILE = FOLDER.."/settings.json"
-local MAP_CONFIG_FILE = FOLDER.."/map_macros.json"
-local GOODFARM_STATE_FILE = FOLDER.."/goodfarm_state.json"
-local LAGSAVER_STATE_FILE = FOLDER.."/lag_saver_state.json"
-local CULLING_POINTS_FILE = FOLDER.."/culling_points.txt"
-local LAST_RESULT_FILE = FOLDER.."/last_run_result.json"
+local AUTH_FILE = FOLDER.."/user_auth.json"   -- คีย์ใช้ร่วมกันทุกจอ (ไม่แยก)
+
+-- ═══════════════════════════════════════════════════════
+-- 👤 PER-ACCOUNT CONFIG PROFILE
+-- เปิดหลายจอด้วยตัวรันเดียวกัน → แต่ละไอดี (UserId) มีโฟลเดอร์คอนฟิกของตัวเอง
+-- ไฟล์ macro ที่อัดไว้ยังใช้ร่วมกันที่ FOLDER เหมือนเดิม
+-- ═══════════════════════════════════════════════════════
+local PROFILES_FOLDER = FOLDER.."/Profiles"
+local PROFILE_ID = tostring(Player.UserId)
+local PROFILE_FOLDER = PROFILES_FOLDER.."/"..PROFILE_ID
+local PROFILE_INFO_FILE = PROFILE_FOLDER.."/profile_info.json"
+
+local CONFIG_FILE = PROFILE_FOLDER.."/settings.json"
+local MAP_CONFIG_FILE = PROFILE_FOLDER.."/map_macros.json"
+local GOODFARM_STATE_FILE = PROFILE_FOLDER.."/goodfarm_state.json"
+local LAGSAVER_STATE_FILE = PROFILE_FOLDER.."/lag_saver_state.json"
+local CULLING_POINTS_FILE = PROFILE_FOLDER.."/culling_points.txt"
+local LAST_RESULT_FILE = PROFILE_FOLDER.."/last_run_result.json"
+local DASHBOARD_FILE = PROFILE_FOLDER.."/dashboard.json"
+local EVENT_COLONY_FILE = PROFILE_FOLDER.."/event_colony.txt"
 local LAGSAVER_BACKGROUND_IMAGE = "rbxassetid://85556556528294"
+
+-- ไฟล์ที่แยกตามไอดี (ชื่อไฟล์เดียวกับเวอร์ชันเก่าที่อยู่ใน FOLDER)
+local PROFILE_FILE_NAMES = {
+    "settings.json", "map_macros.json", "goodfarm_state.json", "lag_saver_state.json",
+    "culling_points.txt", "last_run_result.json", "dashboard.json", "event_colony.txt",
+    "story_towers.json",
+}
 
 pcall(function()
     if not isfolder(FOLDER) then makefolder(FOLDER) end
     if not isfolder(CASINO_FOLDER) then makefolder(CASINO_FOLDER) end
+    if not isfolder(PROFILES_FOLDER) then makefolder(PROFILES_FOLDER) end
+    if not isfolder(PROFILE_FOLDER) then makefolder(PROFILE_FOLDER) end
+end)
+
+-- ครั้งแรกที่ไอดีนี้ยังไม่มีไฟล์ของตัวเอง → คัดลอกจากไฟล์เก่า (ใช้ร่วมกัน) มาให้ จะได้ไม่เสียค่าที่ตั้งไว้
+pcall(function()
+    for _, name in ipairs(PROFILE_FILE_NAMES) do
+        local legacyPath = FOLDER.."/"..name
+        local profilePath = PROFILE_FOLDER.."/"..name
+        if not isfile(profilePath) and isfile(legacyPath) then
+            writefile(profilePath, readfile(legacyPath))
+        end
+    end
+end)
+
+-- บันทึกชื่อไอดีไว้ให้หน้า UI แสดงในรายการโปรไฟล์
+pcall(function()
+    writefile(PROFILE_INFO_FILE, HttpService:JSONEncode({
+        UserId = Player.UserId,
+        Name = Player.Name,
+        DisplayName = Player.DisplayName,
+        UpdatedAt = os.time(),
+    }))
 end)
 
 -- Export Services ผ่าน _G เพื่อให้โมดูลอื่นใช้ได้
@@ -57,6 +100,11 @@ _G._MAP_CONFIG_FILE = MAP_CONFIG_FILE
 _G._LAGSAVER_STATE_FILE = LAGSAVER_STATE_FILE
 _G._CULLING_POINTS_FILE = CULLING_POINTS_FILE
 _G._LAST_RESULT_FILE = LAST_RESULT_FILE
+_G._DASHBOARD_FILE = DASHBOARD_FILE
+_G._EVENT_COLONY_FILE = EVENT_COLONY_FILE
+_G._PROFILES_FOLDER = PROFILES_FOLDER
+_G._PROFILE_FOLDER = PROFILE_FOLDER
+_G._PROFILE_ID = PROFILE_ID
 
 -- ═══════════════════════════════════════════════════════
 -- 🎯 GLOBAL VARIABLES
@@ -121,7 +169,7 @@ _G.StoryTowers = {
     Farm1   = { ID = nil, TowerName = nil, Count = 2 },
     Farm2   = { ID = nil, TowerName = nil, Count = 0 },
 }
-local STORY_TOWER_FILE = FOLDER.."/story_towers.json"
+local STORY_TOWER_FILE = PROFILE_FOLDER.."/story_towers.json"
 _G._STORY_TOWER_FILE = STORY_TOWER_FILE
 
 local function SaveStoryTowers()
@@ -987,7 +1035,9 @@ local function LoadMapMacros()
         if isfile(MAP_CONFIG_FILE) then
             local data = HttpService:JSONDecode(readfile(MAP_CONFIG_FILE))
             if type(data) == "table" then
-                MapMacros = data
+                -- แก้ในตารางเดิม เพื่อให้ _G._MapMacros / โมดูลอื่นที่ถืออ้างอิงไว้เห็นค่าใหม่
+                for k in pairs(MapMacros) do MapMacros[k] = nil end
+                for k, v in pairs(data) do MapMacros[k] = v end
             end
         end
     end)
@@ -1012,6 +1062,83 @@ _G.LoadMapMacros = LoadMapMacros
 _G.AutoSelectMacroForMap = AutoSelectMacroForMap
 
 -- ═══════════════════════════════════════════════════════
+-- 👤 CONFIG PROFILE API (ใช้ในหน้า Main)
+-- ═══════════════════════════════════════════════════════
+
+-- คืนรายการโปรไฟล์ทั้งหมด: { {Id="123", Name="abc", DisplayName="ABC", IsMe=true}, ... }
+local function ListConfigProfiles()
+    local list = {}
+    pcall(function()
+        if not isfolder(PROFILES_FOLDER) then return end
+        for _, path in ipairs(listfiles(PROFILES_FOLDER)) do
+            local id = tostring(path):match("[^/\\]+$")
+            if id and isfolder(PROFILES_FOLDER.."/"..id) then
+                local entry = { Id = id, Name = id, DisplayName = id, IsMe = (id == PROFILE_ID) }
+                pcall(function()
+                    local infoPath = PROFILES_FOLDER.."/"..id.."/profile_info.json"
+                    if isfile(infoPath) then
+                        local info = HttpService:JSONDecode(readfile(infoPath))
+                        entry.Name = tostring(info.Name or id)
+                        entry.DisplayName = tostring(info.DisplayName or entry.Name)
+                    end
+                end)
+                table.insert(list, entry)
+            end
+        end
+    end)
+    table.sort(list, function(a, b)
+        if a.IsMe ~= b.IsMe then return a.IsMe end
+        return a.Name:lower() < b.Name:lower()
+    end)
+    return list
+end
+
+-- โหลดคอนฟิกของไอดีนี้จากไฟล์อีกครั้ง
+local function ReloadMyConfig()
+    LoadConfig()
+    LoadStoryTowers()
+    LoadMapMacros()
+    return true
+end
+
+-- คัดลอกคอนฟิกจากไอดีอื่นมาเป็นของไอดีนี้ แล้วใช้งานทันที
+-- (ไม่คัดลอกความคืบหน้า เช่น Good Farm รอบที่ทำไปแล้ว / ผลรอบล่าสุด / Lag Saver ของจอนั้น)
+local function LoadConfigFromProfile(sourceId)
+    sourceId = tostring(sourceId or "")
+    if sourceId == "" then return false, "ยังไม่ได้เลือกโปรไฟล์" end
+    if sourceId == PROFILE_ID then
+        ReloadMyConfig()
+        return true, "โหลดคอนฟิกของไอดีนี้ใหม่แล้ว"
+    end
+    local srcFolder = PROFILES_FOLDER.."/"..sourceId
+    local srcSettings = srcFolder.."/settings.json"
+    local ok, err = pcall(function()
+        if not isfile(srcSettings) then error("โปรไฟล์นี้ยังไม่มี settings.json") end
+        local data = HttpService:JSONDecode(readfile(srcSettings))
+        if type(data) ~= "table" then error("ไฟล์คอนฟิกเสีย") end
+        data.StoryPendingResult = nil
+        data.GoodFarmCurrentMode = 1
+        data.GoodFarmRoundsDone = 0
+        writefile(CONFIG_FILE, HttpService:JSONEncode(data))
+        for _, name in ipairs({ "map_macros.json", "story_towers.json" }) do
+            local src = srcFolder.."/"..name
+            if isfile(src) then
+                writefile(PROFILE_FOLDER.."/"..name, readfile(src))
+            end
+        end
+    end)
+    if not ok then
+        return false, tostring(err):gsub("^.-:%d+: ", "")
+    end
+    ReloadMyConfig()
+    return true, "คัดลอกคอนฟิกจากไอดี " .. sourceId .. " แล้ว"
+end
+
+_G.ListConfigProfiles = ListConfigProfiles
+_G.ReloadMyConfig = ReloadMyConfig
+_G.LoadConfigFromProfile = LoadConfigFromProfile
+
+-- ═══════════════════════════════════════════════════════
 -- 🚀 INIT: Load saved data
 -- ═══════════════════════════════════════════════════════
 
@@ -1019,4 +1146,5 @@ LoadConfig()
 LoadStoryTowers()
 LoadMapMacros()
 
+print("👤 Config profile: " .. Player.Name .. " (" .. PROFILE_ID .. ") → " .. PROFILE_FOLDER)
 print("✅ [Module 1/12] Config.lua loaded successfully")
