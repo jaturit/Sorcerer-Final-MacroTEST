@@ -424,10 +424,10 @@ local function LoadMainUI()
         print("🤖 [Story] รันสคริปใหม่ในด่าน!")
         task.spawn(function()
             task.wait(3)
-            RunStoryAIPlacement(_G.StoryChapter)
+            _G.RunStoryAIPlacement(_G.StoryChapter)
         end)
         task.spawn(function()
-            WaitForGameEndAndAdvance()
+            _G.WaitForGameEndAndAdvance()
         end)
     end
 
@@ -436,7 +436,7 @@ local function LoadMainUI()
         print("📁 [Story Macro] รันสคริปใหม่ในด่าน! เปิด AutoPlay...")
         _G.AutoPlay = true  -- ให้ Home auto-start จัดการ
         task.spawn(function()
-            WaitForGameEndAndAdvance()
+            _G.WaitForGameEndAndAdvance()
         end)
     end
 
@@ -4171,6 +4171,7 @@ local function LoadMainUI()
     casinoPlayStatus.ZIndex = 5
     casinoPlayStatus.Text = "สถานะ: หยุดทำงาน"
 
+    local setCasinoPlayToggle -- forward declare: task ด้านล่างเรียกใช้ก่อนสร้าง toggle
     -- อัปเดต status และ toggle หลัง LoadConfig
     task.spawn(function()
         task.wait(1)
@@ -4216,7 +4217,6 @@ local function LoadMainUI()
         end
     end)
 
-    local setCasinoPlayToggle
     local function startCasinoLoop()
         if CasinoSelectedFile == "None" then
             casinoPlayStatus.Text = "❌ เลือกไฟล์ก่อน"
@@ -4299,7 +4299,7 @@ local function LoadMainUI()
             casinoRecStatus.Text = "🔴 กำลังอัด..."
             task.spawn(function()
                 while CasinoIsRecording do
-                    casinoRecStatus.Text = "🔴 อัดอยู่ | "..#CasinoCurrentData.." actions | 🚪 "..#CasinoDoorSequence.." ประตูเปิด"
+                    casinoRecStatus.Text = "🔴 อัดอยู่ | "..#CasinoCurrentData.." actions | 🚪 "..#(_G._CasinoDoorSequence or {}).." ประตูเปิด"
                     task.wait(0.5)
                 end
             end)
@@ -4754,7 +4754,7 @@ local function LoadMainUI()
                     local tData = _G.StoryTowers[slotName]
                     if tData.TowerName and tData.TowerName ~= "" then
                         -- มีชื่อ tower → แสดงชื่อ + ราคา
-                        local price = GetTowerSpawnPrice(tData.TowerName)
+                        local price = _G.GetTowerSpawnPrice(tData.TowerName)
                         if price > 0 then
                             idLbl.Text = tData.TowerName .. " (" .. price .. "$)"
                         else
@@ -4804,6 +4804,7 @@ local function LoadMainUI()
     chapterFrame.ZIndex = 4
 
     local chapterBtns = {}
+    local UpdateStageBtns -- forward declare: ปุ่ม Chapter เรียกใช้ก่อนนิยามด้านล่าง
     for i = 1, 3 do
         local btn = Instance.new("TextButton", chapterFrame)
         btn.Text = "Chapter " .. i
@@ -4844,7 +4845,7 @@ local function LoadMainUI()
     stageFrame.ZIndex = 4
 
     local stageBtns = {}
-    local function UpdateStageBtns()
+    UpdateStageBtns = function() -- ประกาศ local ไว้ก่อนปุ่ม Chapter (ใช้ก่อนนิยาม)
         for _, child in pairs(stageFrame:GetChildren()) do child:Destroy() end
         stageBtns = {}
         local offsets = {[1] = 0, [2] = 5, [3] = 10}

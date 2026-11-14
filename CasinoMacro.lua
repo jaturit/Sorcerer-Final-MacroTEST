@@ -20,6 +20,7 @@ local function StartCasinoDoorTracker()
     CasinoDoorTrackerThreadID = CasinoDoorTrackerThreadID + 1
     local currentThread = CasinoDoorTrackerThreadID
     CasinoDoorSequence = {}
+    _G._CasinoDoorSequence = CasinoDoorSequence -- อัปเดตอ้างอิงให้ UI เห็นตารางใหม่
     task.spawn(function()
         local doorStates = {}
         for i = 1, 8 do doorStates[i] = false end
